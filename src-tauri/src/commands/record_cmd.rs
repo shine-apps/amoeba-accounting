@@ -1,0 +1,143 @@
+use std::sync::Mutex;
+use rusqlite::Connection;
+use tauri::State;
+use crate::models::accounting_record::{AccountingRecord, AccountingResult, RecordInput};
+use crate::models::labor_time::LaborTime;
+use crate::repository::{record_repo, expense_repo, labor_repo};
+use crate::services::{calculate, validate_record};
+
+/// 获取某个阿米巴的所有核算记录
+#[tauri::command]
+pub async fn list_records(
+    db: State<'_, Mutex<Connection>>,
+    amoeba_id: i64,
+) -> Result<Vec<AccountingRecord>, String> {
+    let conn = db.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    record_repo::list_by_amoeba(&conn, amoeba_id)
+        .map_err(|e| format!("查询核算记录失败: {}", e))
+}
+
+/// 获取单条核算记录（含完整关联数据）
+#[tauri::command]
+pub async fn get_record(
+    db: State<'_, Mutex<Connection>>,
+    id: i64,
+) -> Result<Option<AccountingRecord>, String> {
+    let conn = db.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    record_repo::get_with_details(&conn, id).map_err(|e| format!("查询核算记录失败: {}", e))
+}
+
+/// 保存核算记录（新建或更新）
+///
+/// 如果 input 中包含有效的 record_id（通过 amoeba_id 字段负值传递，或通过额外参数），
+/// 则执行更新操作；否则执行新建操作。
+/// 这里使用独立的 record_id 参数来区分新建/更新。
+#[tauri::command]
+pub async fn save_record(
+    db: State<'_, Mutex<Connection>>,
+    record_id: Option<i64>,
+    input: RecordInput,
+) -> Result<AccountingResult, String> {
+    // 数据校验
+    validate_record(&input)?;
+
+    // 计算核算结果
+    let result = calculate(&input.expenses, &input.labor, input.external_sales, input.internal_sales);
+
+    let conn = db.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+
+    match record_id {
+        Some(id) if id > 0 => {
+            // 更新已有记录
+            let existing = record_repo::get_with_details(&conn, id)
+                .map_err(|e| format!("查询记录失败: {}", e))?
+                .ok_or_else(|| format!("记录 ID {} 不存在", id))?;
+
+            let record = AccountingRecord {
+                id: Some(id),
+                amoeba_id: input.amoeba_id,
+                period_type: input.period_type,
+                period_start: input.period_start,
+                period_end: input.period_end,
+                external_sales: input.external_sales,
+                internal_sales: input.internal_sales,
+                remark: input.remark,
+                created_at: existing.created_at,
+                updated_at: String::new(),
+                expenses: vec![],
+                labor: LaborTime {
+                    id: None,
+                    record_id: Some(id),
+                    normal_hours: input.labor.normal_hours,
+                    overtime_hours: input.labor.overtime_hours,
+                    public_hours: input.labor.public_hours,
+                    headcount: input.labor.headcount,
+                },
+                result: Some(result.clone()),
+            };
+
+            // 更新主记录
+            record_repo::update(&conn, &record, &result)
+                .map_err(|e| format!("更新核算记录失败: {}", e))?;
+
+            // 更新费用明细：先删除旧的，再插入新的
+            expense_repo::delete_by_record(&conn, id)
+                .map_err(|e| format!("删除旧费用明细失败: {}", e))?;
+            expense_repo::insert_batch(&conn, id, &input.expenses)
+                .map_err(|e| format!("插入费用明细失败: {}", e))?;
+
+            // 更新工时记录
+            labor_repo::update(&conn, id, &input.labor)
+                .map_err(|e| format!("更新工时记录失败: {}", e))?;
+        }
+        _ => {
+            // 新建记录
+            let record = AccountingRecord {
+                id: None,
+                amoeba_id: input.amoeba_id,
+                period_type: input.period_type,
+                period_start: input.period_start,
+                period_end: input.period_end,
+                external_sales: input.external_sales,
+                internal_sales: input.internal_sales,
+                remark: input.remark,
+                created_at: String::new(),
+                updated_at: String::new(),
+                expenses: vec![],
+                labor: LaborTime {
+                    id: None,
+                    record_id: None,
+                    normal_hours: 0.0,
+                    overtime_hours: 0.0,
+                    public_hours: 0.0,
+                    headcount: 1,
+                },
+                result: Some(result.clone()),
+            };
+
+            // 插入主记录
+            let new_id = record_repo::insert(&conn, &record, &result)
+                .map_err(|e| format!("插入核算记录失败: {}", e))?;
+
+            // 插入费用明细
+            expense_repo::insert_batch(&conn, new_id, &input.expenses)
+                .map_err(|e| format!("插入费用明细失败: {}", e))?;
+
+            // 插入工时记录
+            labor_repo::insert(&conn, new_id, &input.labor)
+                .map_err(|e| format!("插入工时记录失败: {}", e))?;
+        }
+    }
+
+    Ok(result)
+}
+
+/// 删除核算记录
+#[tauri::command]
+pub async fn delete_record(
+    db: State<'_, Mutex<Connection>>,
+    id: i64,
+) -> Result<(), String> {
+    let conn = db.lock().map_err(|e| format!("获取数据库锁失败: {}", e))?;
+    record_repo::delete(&conn, id).map_err(|e| format!("删除核算记录失败: {}", e))
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/tauri.conf.json",
+  "productName": "阿米巴单位时间核算表",
+  "version": "0.1.0",
+  "identifier": "com.amoeba.accounting",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "阿米巴单位时间核算表",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "dialog": {
+      "open": true,
+      "save": true
+    },
+    "fs": {
+      "scope": {
+        "allow": ["$APPDATA/**", "$HOME/Documents/**", "$HOME/Downloads/**"]
+      }
+    }
+  }
+}
