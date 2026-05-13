@@ -4,6 +4,71 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>阿米巴单位时间核算表</title>
+  <script>
+    // Mock Tauri IPC bridge for browser-only development (pnpm dev).
+    // When running inside Tauri, this is overwritten by the real bridge before any module loads.
+    if (!window.__TAURI_INTERNALS__) {
+      let warned = false
+      let nextCallbackId = 1
+      const callbacks = new Map()
+      const warnOnce = () => {
+        if (!warned) { warned = true; console.warn('[dev] Tauri API not available — running in browser-only mode. Use "pnpm tauri dev" for the full app.') }
+      }
+      let nextMockAmoebaId = 1
+      const mockAmoebas = new Map()
+      window.__TAURI_INTERNALS__ = {
+        __isMock: true,
+        invoke: (cmd, args) => {
+          warnOnce()
+          if (cmd === 'list_amoebas') {
+            return Promise.resolve([...mockAmoebas.values()])
+          }
+          if (cmd === 'create_amoeba') {
+            const input = args?.input || {}
+            const amoeba = {
+              id: nextMockAmoebaId++,
+              name: input.name || '',
+              amoeba_type: input.amoeba_type || '',
+              leader: input.leader || '',
+              parent_id: input.parent_id ?? null,
+              status: 'active',
+              created_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+              updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+            }
+            mockAmoebas.set(amoeba.id, amoeba)
+            return Promise.resolve(amoeba)
+          }
+          if (cmd === 'update_amoeba') {
+            const { id, input } = args || {}
+            const existing = mockAmoebas.get(id) || {}
+            const updated = {
+              ...existing,
+              name: input?.name ?? existing.name,
+              amoeba_type: input?.amoeba_type ?? existing.amoeba_type,
+              leader: input?.leader ?? existing.leader,
+              parent_id: input?.parent_id ?? existing.parent_id,
+              updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+            }
+            mockAmoebas.set(id, updated)
+            return Promise.resolve(updated)
+          }
+          if (cmd === 'delete_amoeba') {
+            mockAmoebas.delete(args?.id)
+            return Promise.resolve()
+          }
+          if (cmd === 'list_records') return Promise.resolve([])
+          if (cmd === 'get_record') return Promise.resolve(null)
+          if (cmd === 'save_record') return Promise.resolve({ id: 0, amoeba_id: 0, period_type: '', period_start: '', period_end: '' })
+          if (cmd === 'delete_record') return Promise.resolve()
+          if (cmd === 'export_excel') return Promise.resolve('')
+          return Promise.resolve(null)
+        },
+        transformCallback: (fn) => { const id = nextCallbackId++; callbacks.set(id, fn); return id },
+        unregisterCallback: (id) => { callbacks.delete(id) },
+        convertFileSrc: (path) => path,
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="app"></div>

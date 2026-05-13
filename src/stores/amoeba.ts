@@ -13,7 +13,8 @@ export const useAmoebaStore = defineStore('amoeba', () => {
   async function fetchList() {
     loading.value = true
     try {
-      amoebas.value = await listAmoebas()
+      const list = await listAmoebas()
+      amoebas.value = Array.isArray(list) ? list.filter(Boolean) : []
     } finally {
       loading.value = false
     }
@@ -21,18 +22,22 @@ export const useAmoebaStore = defineStore('amoeba', () => {
 
   async function create(input: AmoebaInput) {
     const amoeba = await createAmoeba(input)
-    amoebas.value.push(amoeba)
+    if (amoeba) {
+      amoebas.value.push(amoeba)
+    }
     return amoeba
   }
 
   async function update(id: number, input: AmoebaInput) {
     const amoeba = await updateAmoeba(id, input)
-    const index = amoebas.value.findIndex((a) => a.id === id)
-    if (index !== -1) {
-      amoebas.value[index] = amoeba
-    }
-    if (currentAmoeba.value?.id === id) {
-      currentAmoeba.value = amoeba
+    if (amoeba) {
+      const index = amoebas.value.findIndex((a) => a.id === id)
+      if (index !== -1) {
+        amoebas.value[index] = amoeba
+      }
+      if (currentAmoeba.value?.id === id) {
+        currentAmoeba.value = amoeba
+      }
     }
     return amoeba
   }

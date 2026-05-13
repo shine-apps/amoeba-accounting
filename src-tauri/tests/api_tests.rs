@@ -1368,9 +1368,309 @@ mod tests {
         #[test]
         fn test_expense_delete_by_record_empty() {
             let conn = setup_db();
-            // 即使没有费用明细，delete 也应成功
             let result = expense_repo::delete_by_record(&conn, 9999);
             assert!(result.is_ok());
+        }
+    }
+
+    // ============================================================
+    // Excel 导出内容验证测试 (使用 calamine 读取生成的 xlsx)
+    // ============================================================
+    mod excel_content_tests {
+        use super::*;
+        use calamine::{open_workbook_auto, Reader};
+
+        fn temp_output_path(name: &str) -> String {
+            let mut path = std::env::temp_dir();
+            path.push(format!("amoeba_content_test_{}", name));
+            path.to_str().unwrap().to_string()
+        }
+
+        fn create_export_file(conn: &Connection, output: &str) -> (i64, String) {
+            let amoeba = amoeba_cmd::create_amoeba_inner(conn, &AmoebaInput {
+                name: "内容验证阿米巴".into(),
+                amoeba_type: "生产型".into(),
+                leader: "测试员".into(),
+                parent_id: None,
+            }).unwrap();
+            let amoeba_id = amoeba.id.unwrap();
+
+            let input = RecordInput {
+                amoeba_id,
+                period_type: "month".into(),
+                period_start: "2026-05-01".into(),
+                period_end: "2026-05-31".into(),
+                external_sales: 600_000.0,
+                internal_sales: 150_000.0,
+                remark: "测试".into(),
+                expenses: vec![
+                    ExpenseDetailInput { category: "material".into(), amount: 200_000.0, description: "原料".into() },
+                    ExpenseDetailInput { category: "electricity".into(), amount: 30_000.0, description: "电费".into() },
+                ],
+                labor: LaborTimeInput {
+                    normal_hours: 160.0,
+                    overtime_hours: 20.0,
+                    public_hours: 0.0,
+                    headcount: 8,
+                },
+            };
+            record_cmd::save_record_inner(conn, None, &input).unwrap();
+
+            let result_path = export_cmd::export_excel_inner(
+                conn, amoeba_id, None, None, None, output,
+            ).unwrap();
+            (amoeba_id, result_path)
+        }
+
+        #[test]
+        fn test_export_sheet_names() {
+            let conn = setup_db();
+            let output = temp_output_path("sheets");
+            let (_, path) = create_export_file(&conn, &output);
+
+            let workbook = open_workbook_auto(&path).unwrap();
+            let names = workbook.sheet_names().to_vec();
+            assert_eq!(names.len(), 3);
+            assert!(names.iter().any(|n| n.contains("核算表")));
+            assert!(names.iter().any(|n| n.contains("费用明细")));
+            assert!(names.iter().any(|n| n.contains("趋势分析")));
+
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn test_export_accounting_sheet_headers() {
+            let conn = setup_db();
+            let output = temp_output_path("headers");
+            let (_, path) = create_export_file(&conn, &output);
+
+            let mut workbook = open_workbook_auto(&path).unwrap();
+            let sheet_name = workbook.sheet_names().iter()
+                .find(|n| n.contains("核算表")).unwrap().clone();
+            let range = workbook.worksheet_range(&sheet_name).unwrap();
+
+            let header_row = 2usize;
+            let expected_headers = [
+                "期间", "外部销售额", "内部销售额", "总销售额",
+                "总费用", "附加价值", "总工时(h)", "单位时间附加值",
+                "人均销售额", "人均附加值", "附加值率(%)", "费用率(%)",
+            ];
+            for (col, expected) in expected_headers.iter().enumerate() {
+                let cell = range.get_value((header_row as u32, col as u32)).unwrap();
+                assert_eq!(cell.to_string(), *expected,
+                    "Header mismatch at col {}: expected '{}', got '{}'",
+                    col, expected, cell);
+            }
+
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn test_export_accounting_sheet_data() {
+            let conn = setup_db();
+            let output = temp_output_path("data");
+            let (_, path) = create_export_file(&conn, &output);
+
+            let mut workbook = open_workbook_auto(&path).unwrap();
+            let sheet_name = workbook.sheet_names().iter()
+                .find(|n| n.contains("核算表")).unwrap().clone();
+            let range = workbook.worksheet_range(&sheet_name).unwrap();
+
+            let data_row = 3usize;
+            let period_start = range.get_value((data_row as u32, 0)).unwrap().to_string();
+            assert_eq!(period_start, "2026-05-01");
+
+            let ext_sales = range.get_value((data_row as u32, 1)).unwrap();
+            assert!(ext_sales.to_string().contains("600000"));
+
+            let total_row = 4usize;
+            let total_label = range.get_value((total_row as u32, 0)).unwrap().to_string();
+            assert_eq!(total_label, "合计");
+
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn test_export_expense_sheet_headers() {
+            let conn = setup_db();
+            let output = temp_output_path("exp_headers");
+            let (_, path) = create_export_file(&conn, &output);
+
+            let mut workbook = open_workbook_auto(&path).unwrap();
+            let sheet_name = workbook.sheet_names().iter()
+                .find(|n| n.contains("费用明细")).unwrap().clone();
+            let range = workbook.worksheet_range(&sheet_name).unwrap();
+
+            let expected_headers = ["期间", "费用分类", "金额", "说明"];
+            for (col, expected) in expected_headers.iter().enumerate() {
+                let cell = range.get_value((1u32, col as u32)).unwrap();
+                assert_eq!(cell.to_string(), *expected);
+            }
+
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn test_export_expense_sheet_data_rows() {
+            let conn = setup_db();
+            let output = temp_output_path("exp_data");
+            let (_, path) = create_export_file(&conn, &output);
+
+            let mut workbook = open_workbook_auto(&path).unwrap();
+            let sheet_name = workbook.sheet_names().iter()
+                .find(|n| n.contains("费用明细")).unwrap().clone();
+            let range = workbook.worksheet_range(&sheet_name).unwrap();
+
+            let row2_category = range.get_value((2u32, 1)).unwrap().to_string();
+            assert!(row2_category == "material" || row2_category == "electricity");
+
+            let amount_cell = range.get_value((2u32, 2)).unwrap();
+            let amount_str = amount_cell.to_string();
+            assert!(amount_str.contains("200000") || amount_str.contains("30000"));
+
+            std::fs::remove_file(&path).ok();
+        }
+
+        #[test]
+        fn test_export_trend_sheet_headers() {
+            let conn = setup_db();
+            let output = temp_output_path("trend_headers");
+            let (_, path) = create_export_file(&conn, &output);
+
+            let mut workbook = open_workbook_auto(&path).unwrap();
+            let sheet_name = workbook.sheet_names().iter()
+                .find(|n| n.contains("趋势分析")).unwrap().clone();
+            let range = workbook.worksheet_range(&sheet_name).unwrap();
+
+            let expected_headers = [
+                "期间", "总销售额", "总费用", "附加价值",
+                "总工时(h)", "单位时间附加值", "人均销售额",
+                "附加值率(%)", "费用率(%)",
+            ];
+            for (col, expected) in expected_headers.iter().enumerate() {
+                let cell = range.get_value((1u32, col as u32)).unwrap();
+                assert_eq!(cell.to_string(), *expected);
+            }
+
+            std::fs::remove_file(&path).ok();
+        }
+    }
+
+    // ============================================================
+    // 汇总器边界条件测试
+    // ============================================================
+    mod aggregator_edge_tests {
+        use super::*;
+
+        fn make_record(amoeba_id: i64, period_start: &str, period_end: &str,
+                       ext_sales: f64, int_sales: f64,
+                       expenses: Vec<ExpenseDetail>, labor: LaborTime) -> AccountingRecord {
+            AccountingRecord {
+                id: None,
+                amoeba_id,
+                period_type: "day".into(),
+                period_start: period_start.into(),
+                period_end: period_end.into(),
+                external_sales: ext_sales,
+                internal_sales: int_sales,
+                remark: String::new(),
+                created_at: String::new(),
+                updated_at: String::new(),
+                expenses,
+                labor,
+                result: None,
+            }
+        }
+
+        #[test]
+        fn test_aggregate_zero_headcount_uses_one() {
+            let records = vec![
+                make_record(1, "2026-05-01", "2026-05-01", 50000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 160.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 0,
+                    }),
+                make_record(1, "2026-05-01", "2026-05-01", 50000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 160.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 0,
+                    }),
+            ];
+
+            let aggregated = aggregator::aggregate_records(&records, "day");
+            assert_eq!(aggregated.len(), 1);
+            let agg = &aggregated[0];
+            // headcount 取 max(0,0)=0，但在计算结果时 headcount 为 0 → 转为 1
+            let result = agg.result.as_ref().unwrap();
+            assert!(result.sales_per_person > 0.0);
+            assert!(result.value_per_person > 0.0);
+        }
+
+        #[test]
+        fn test_aggregate_different_amoebas_same_period() {
+            // 验证当前行为：按 period_start 分组，不区分 amoeba_id
+            let records = vec![
+                make_record(1, "2026-05-01", "2026-05-01", 10000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 8.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 2,
+                    }),
+                make_record(2, "2026-05-01", "2026-05-01", 20000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 8.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 3,
+                    }),
+            ];
+
+            let aggregated = aggregator::aggregate_records(&records, "day");
+            // 当前行为：不同 amoeba 但相同 period_start 会合并
+            assert_eq!(aggregated.len(), 1);
+            let agg = &aggregated[0];
+            assert!((agg.external_sales - 30_000.0).abs() < 0.01);
+            // headcount 取最大值
+            assert_eq!(agg.labor.headcount, 3);
+        }
+
+        #[test]
+        fn test_aggregate_multiple_periods_sorted() {
+            let records = vec![
+                make_record(1, "2026-05-03", "2026-05-03", 30000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 8.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 1,
+                    }),
+                make_record(1, "2026-05-01", "2026-05-01", 10000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 8.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 1,
+                    }),
+                make_record(1, "2026-05-02", "2026-05-02", 20000.0, 0.0,
+                    vec![],
+                    LaborTime {
+                        id: None, record_id: None,
+                        normal_hours: 8.0, overtime_hours: 0.0,
+                        public_hours: 0.0, headcount: 1,
+                    }),
+            ];
+
+            let aggregated = aggregator::aggregate_records(&records, "day");
+            assert_eq!(aggregated.len(), 3);
+            // 应按 period_start 升序排列
+            assert_eq!(aggregated[0].period_start, "2026-05-01");
+            assert_eq!(aggregated[1].period_start, "2026-05-02");
+            assert_eq!(aggregated[2].period_start, "2026-05-03");
         }
     }
 }
