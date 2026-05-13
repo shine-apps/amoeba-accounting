@@ -25,14 +25,7 @@
     }
   },
   "plugins": {
-    "dialog": {
-      "open": true,
-      "save": true
-    },
-    "fs": {
-      "scope": {
-        "allow": ["$APPDATA/**", "$HOME/Documents/**", "$HOME/Downloads/**"]
-      }
-    }
+    "dialog": null,
+    "fs": null
   }
 }
