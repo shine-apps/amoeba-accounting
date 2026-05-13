@@ -1,11 +1,12 @@
 use crate::models::accounting_record::AccountingResult;
 use crate::models::expense_detail::ExpenseDetailInput;
+use crate::models::income_detail::IncomeDetailInput;
 use crate::models::labor_time::LaborTimeInput;
 
 /// 核算计算引擎 - 实现阿米巴经营核算的 9 个核心公式
 ///
 /// 公式说明：
-/// 1. 总销售额 = 外部销售额 + 内部销售额
+/// 1. 总销售额 = SUM(各项收入明细金额)
 /// 2. 总费用 = SUM(各项费用明细金额)
 /// 3. 附加价值 = 总销售额 - 总费用
 /// 4. 总劳动时间 = 正常工时 + 加班工时 + 公共工时
@@ -15,13 +16,12 @@ use crate::models::labor_time::LaborTimeInput;
 /// 8. 附加值率 = 附加价值 / 总销售额 * 100
 /// 9. 费用率 = 总费用 / 总销售额 * 100
 pub fn calculate(
+    income_details: &[IncomeDetailInput],
     expenses: &[ExpenseDetailInput],
     labor: &LaborTimeInput,
-    external_sales: f64,
-    internal_sales: f64,
 ) -> AccountingResult {
-    // 公式1: 总销售额 = 外部销售额 + 内部销售额
-    let total_sales = external_sales + internal_sales;
+    // 公式1: 总销售额 = SUM(各项收入明细金额)
+    let total_sales: f64 = income_details.iter().map(|i| i.amount).sum();
 
     // 公式2: 总费用 = SUM(各项费用明细金额)
     let total_expense: f64 = expenses.iter().map(|e| e.amount).sum();

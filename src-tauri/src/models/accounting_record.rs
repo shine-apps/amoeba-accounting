@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use super::{expense_detail::ExpenseDetail, expense_detail::ExpenseDetailInput, labor_time::LaborTime, labor_time::LaborTimeInput};
+use super::{expense_detail::ExpenseDetail, expense_detail::ExpenseDetailInput, income_detail::IncomeDetail, income_detail::IncomeDetailInput, labor_time::LaborTime, labor_time::LaborTimeInput};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountingRecord {
@@ -14,6 +14,7 @@ pub struct AccountingRecord {
     pub created_at: String,
     pub updated_at: String,
     // 关联数据
+    pub income_details: Vec<IncomeDetail>,
     pub expenses: Vec<ExpenseDetail>,
     pub labor: LaborTime,
     // 计算结果
@@ -39,9 +40,8 @@ pub struct RecordInput {
     pub period_type: String,
     pub period_start: String,
     pub period_end: String,
-    pub external_sales: f64,
-    pub internal_sales: f64,
     pub remark: String,
+    pub income_details: Vec<IncomeDetailInput>,
     pub expenses: Vec<ExpenseDetailInput>,
     pub labor: LaborTimeInput,
 }

@@ -12,6 +12,20 @@ export interface ExpenseDetailInput {
   description: string
 }
 
+export interface IncomeDetail {
+  id?: number
+  record_id?: number
+  category: string
+  amount: number
+  description: string
+}
+
+export interface IncomeDetailInput {
+  category: string
+  amount: number
+  description: string
+}
+
 export interface LaborTime {
   id?: number
   record_id?: number

@@ -11,6 +11,13 @@ export const EXPENSE_CATEGORIES = [
   { code: 'other', name: '其他费用' },
 ] as const
 
+export const INCOME_CATEGORIES = [
+  { code: 'external_sales', name: '对外销售' },
+  { code: 'internal_sales', name: '内部交易' },
+  { code: 'service', name: '服务收入' },
+  { code: 'other', name: '其他收入' },
+] as const
+
 export const AMOEBA_TYPES = ['生产型', '营销型', '研发型', '管理型'] as const
 export const PERIOD_TYPES = [
   { value: 'month', label: '按月' },

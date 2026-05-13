@@ -29,12 +29,14 @@ pub fn validate_record(input: &RecordInput) -> Result<(), String> {
         return Err("周期开始日期不能晚于结束日期".to_string());
     }
 
-    // 校验销售额
-    if input.external_sales < 0.0 {
-        return Err("外部销售额不能为负数".to_string());
-    }
-    if input.internal_sales < 0.0 {
-        return Err("内部销售额不能为负数".to_string());
+    // 校验收入明细
+    for (i, income) in input.income_details.iter().enumerate() {
+        if income.category.trim().is_empty() {
+            return Err(format!("第 {} 项收入明细的分类不能为空", i + 1));
+        }
+        if income.amount < 0.0 {
+            return Err(format!("第 {} 项收入明细的金额不能为负数", i + 1));
+        }
     }
 
     // 校验费用明细

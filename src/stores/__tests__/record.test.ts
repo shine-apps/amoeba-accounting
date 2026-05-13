@@ -24,11 +24,15 @@ function makeRecord(overrides: Partial<AccountingRecord> = {}): AccountingRecord
     period_type: 'month',
     period_start: '2026-05-01',
     period_end: '2026-05-31',
-    external_sales: 800000,
-    internal_sales: 200000,
+    external_sales: 0,
+    internal_sales: 0,
     remark: '',
     created_at: '2026-05-01T00:00:00',
     updated_at: '2026-05-01T00:00:00',
+    income_details: [
+      { category: 'external_sales', amount: 800000, description: '' },
+      { category: 'internal_sales', amount: 200000, description: '' },
+    ],
     expenses: [],
     labor: {
       normal_hours: 160,
@@ -47,6 +51,22 @@ function makeRecord(overrides: Partial<AccountingRecord> = {}): AccountingRecord
       value_rate: 60,
       expense_rate: 40,
     },
+    ...overrides,
+  }
+}
+
+function makeInput(overrides: Partial<RecordInput> = {}): RecordInput {
+  return {
+    amoeba_id: 1,
+    period_type: 'month',
+    period_start: '2026-06-01',
+    period_end: '2026-06-30',
+    remark: 'new',
+    income_details: [
+      { category: 'external_sales', amount: 500000, description: '' },
+    ],
+    expenses: [],
+    labor: { normal_hours: 160, overtime_hours: 0, public_hours: 0, headcount: 3 },
     ...overrides,
   }
 }
@@ -96,25 +116,14 @@ describe('useRecordStore', () => {
       const store = useRecordStore()
       store.records = [makeRecord({ id: 1, remark: 'existing' })]
 
-      const input: RecordInput = {
-        amoeba_id: 1,
-        period_type: 'month',
-        period_start: '2026-06-01',
-        period_end: '2026-06-30',
-        external_sales: 500000,
-        internal_sales: 0,
-        remark: 'new',
-        expenses: [],
-        labor: { normal_hours: 160, overtime_hours: 0, public_hours: 0, headcount: 3 },
-      }
-
+      const input = makeInput()
       const saved = makeRecord({ id: 2, remark: 'new' })
       mockSaveRecord.mockResolvedValue(saved)
 
-      const result = await store.save(input)
+      const result = await store.save(null, input)
       expect(result).toEqual(saved)
       expect(store.records).toHaveLength(2)
-      expect(store.records[0].id).toBe(2) // prepended
+      expect(store.records[0].id).toBe(2)
       expect(store.currentRecord).toEqual(saved)
     })
 
@@ -122,22 +131,11 @@ describe('useRecordStore', () => {
       const store = useRecordStore()
       store.records = [makeRecord({ id: 1, remark: 'old' })]
 
-      const input: RecordInput = {
-        amoeba_id: 1,
-        period_type: 'month',
-        period_start: '2026-05-01',
-        period_end: '2026-05-31',
-        external_sales: 900000,
-        internal_sales: 0,
-        remark: 'updated',
-        expenses: [],
-        labor: { normal_hours: 160, overtime_hours: 0, public_hours: 0, headcount: 3 },
-      }
-
+      const input = makeInput({ remark: 'updated' })
       const saved = makeRecord({ id: 1, remark: 'updated' })
       mockSaveRecord.mockResolvedValue(saved)
 
-      const result = await store.save(input)
+      const result = await store.save(1, input)
       expect(result).toEqual(saved)
       expect(store.records).toHaveLength(1)
       expect(store.records[0].remark).toBe('updated')

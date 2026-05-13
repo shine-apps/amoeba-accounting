@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { useAccounting } from '../useAccounting'
-import type { ExpenseDetailInput, LaborTimeInput } from '@/types/accounting'
+import type { ExpenseDetailInput, IncomeDetailInput, LaborTimeInput } from '@/types/accounting'
 
 const { calculate } = useAccounting()
 
 describe('useAccounting.calculate', () => {
   it('computes all 9 formulas correctly for standard data', () => {
+    const incomeDetails: IncomeDetailInput[] = [
+      { category: 'external_sales', amount: 800000, description: '对外' },
+      { category: 'internal_sales', amount: 200000, description: '内部' },
+    ]
     const expenses: ExpenseDetailInput[] = [
       { category: 'material', amount: 400000, description: '原材料' },
       { category: 'electricity', amount: 50000, description: '电费' },
@@ -18,7 +22,7 @@ describe('useAccounting.calculate', () => {
       headcount: 10,
     }
 
-    const result = calculate(expenses, labor, 800000, 200000)
+    const result = calculate(incomeDetails, expenses, labor)
 
     expect(result.total_sales).toBeCloseTo(1_000_000, 2)
     expect(result.total_expense).toBeCloseTo(480_000, 2)
@@ -32,6 +36,7 @@ describe('useAccounting.calculate', () => {
   })
 
   it('handles zero sales — negative added value, zero rates', () => {
+    const incomeDetails: IncomeDetailInput[] = []
     const expenses: ExpenseDetailInput[] = [
       { category: 'material', amount: 1000, description: '' },
     ]
@@ -42,7 +47,7 @@ describe('useAccounting.calculate', () => {
       headcount: 5,
     }
 
-    const result = calculate(expenses, labor, 0, 0)
+    const result = calculate(incomeDetails, expenses, labor)
 
     expect(result.total_sales).toBeCloseTo(0, 2)
     expect(result.total_expense).toBeCloseTo(1000, 2)
@@ -53,6 +58,9 @@ describe('useAccounting.calculate', () => {
   })
 
   it('returns zero unit_value when total hours is zero', () => {
+    const incomeDetails: IncomeDetailInput[] = [
+      { category: 'external_sales', amount: 10000, description: '' },
+    ]
     const expenses: ExpenseDetailInput[] = []
     const labor: LaborTimeInput = {
       normal_hours: 0,
@@ -61,13 +69,16 @@ describe('useAccounting.calculate', () => {
       headcount: 1,
     }
 
-    const result = calculate(expenses, labor, 10000, 0)
+    const result = calculate(incomeDetails, expenses, labor)
 
     expect(result.total_hours).toBeCloseTo(0, 2)
     expect(result.unit_value).toBeCloseTo(0, 2)
   })
 
   it('handles empty expense list', () => {
+    const incomeDetails: IncomeDetailInput[] = [
+      { category: 'external_sales', amount: 50000, description: '' },
+    ]
     const labor: LaborTimeInput = {
       normal_hours: 160,
       overtime_hours: 0,
@@ -75,7 +86,7 @@ describe('useAccounting.calculate', () => {
       headcount: 2,
     }
 
-    const result = calculate([], labor, 50000, 0)
+    const result = calculate(incomeDetails, [], labor)
 
     expect(result.total_expense).toBeCloseTo(0, 2)
     expect(result.added_value).toBeCloseTo(50_000, 2)
@@ -83,6 +94,9 @@ describe('useAccounting.calculate', () => {
   })
 
   it('handles loss scenario (expenses > sales)', () => {
+    const incomeDetails: IncomeDetailInput[] = [
+      { category: 'external_sales', amount: 500000, description: '' },
+    ]
     const expenses: ExpenseDetailInput[] = [
       { category: 'material', amount: 900000, description: '' },
     ]
@@ -93,7 +107,7 @@ describe('useAccounting.calculate', () => {
       headcount: 5,
     }
 
-    const result = calculate(expenses, labor, 500000, 0)
+    const result = calculate(incomeDetails, expenses, labor)
 
     expect(result.added_value).toBeLessThan(0)
     expect(result.added_value).toBeCloseTo(-400_000, 2)

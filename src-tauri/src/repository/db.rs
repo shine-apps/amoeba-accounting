@@ -83,10 +83,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             FOREIGN KEY (record_id) REFERENCES accounting_record(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS income_detail (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id   INTEGER NOT NULL,
+            category    TEXT NOT NULL,
+            amount      REAL NOT NULL DEFAULT 0,
+            description TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (record_id) REFERENCES accounting_record(id) ON DELETE CASCADE
+        );
+
         CREATE INDEX IF NOT EXISTS idx_accounting_record_amoeba ON accounting_record(amoeba_id);
         CREATE INDEX IF NOT EXISTS idx_accounting_record_period ON accounting_record(period_type, period_start, period_end);
         CREATE INDEX IF NOT EXISTS idx_expense_detail_record ON expense_detail(record_id);
         CREATE INDEX IF NOT EXISTS idx_labor_time_record ON labor_time(record_id);
+        CREATE INDEX IF NOT EXISTS idx_income_detail_record ON income_detail(record_id);
         ",
     )?;
 

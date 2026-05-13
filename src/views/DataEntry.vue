@@ -64,39 +64,7 @@
       <template #header>
         <span>销售收入</span>
       </template>
-      <el-row :gutter="16">
-        <el-col :span="8">
-          <el-form-item label="对外销售额">
-            <el-input-number
-              v-model="formData.external_sales"
-              :min="0"
-              :precision="2"
-              :controls="false"
-              placeholder="0.00"
-              style="width: 100%"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="内部交易额">
-            <el-input-number
-              v-model="formData.internal_sales"
-              :min="0"
-              :precision="2"
-              :controls="false"
-              placeholder="0.00"
-              style="width: 100%"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="合计">
-            <div class="total-display">
-              {{ formatMoney(formData.external_sales + formData.internal_sales) }} 元
-            </div>
-          </el-form-item>
-        </el-col>
-      </el-row>
+      <IncomeEditor v-model="formData.income_details" />
     </el-card>
 
     <!-- 费用明细 -->
@@ -140,11 +108,11 @@ import { useAmoebaStore } from '@/stores/amoeba'
 import { useRecordStore } from '@/stores/record'
 import { useAccounting } from '@/composables/useAccounting'
 import { PERIOD_TYPES } from '@/utils/constants'
-import { formatMoney } from '@/utils/format'
+import IncomeEditor from '@/components/IncomeEditor.vue'
 import ExpenseEditor from '@/components/ExpenseEditor.vue'
 import LaborTimeEditor from '@/components/LaborTimeEditor.vue'
 import ResultPreview from '@/components/ResultPreview.vue'
-import type { RecordInput, ExpenseDetailInput, LaborTimeInput } from '@/types/record'
+import type { RecordInput, ExpenseDetailInput, IncomeDetailInput, LaborTimeInput } from '@/types/record'
 import type { AccountingResult } from '@/types/accounting'
 
 const route = useRoute()
@@ -162,9 +130,8 @@ const formData = reactive({
   period_type: 'month' as string,
   period_start: '' as string,
   period_end: '' as string,
-  external_sales: 0,
-  internal_sales: 0,
   remark: '',
+  income_details: [] as IncomeDetailInput[],
   expenses: [] as ExpenseDetailInput[],
   labor: {
     normal_hours: 0,
@@ -185,11 +152,20 @@ watch(dateRange, (val) => {
 })
 
 const previewResult = computed<AccountingResult | null>(() => {
-  if (formData.expenses.length === 0 && formData.external_sales === 0 && formData.internal_sales === 0) {
+  if (formData.income_details.length === 0 && formData.expenses.length === 0) {
     return null
   }
-  return calculate(formData.expenses, formData.labor, formData.external_sales, formData.internal_sales)
+  return calculate(formData.income_details, formData.expenses, formData.labor)
 })
+
+function getDefaultIncomes(): IncomeDetailInput[] {
+  return [
+    { category: 'external_sales', amount: 0, description: '' },
+    { category: 'internal_sales', amount: 0, description: '' },
+    { category: 'service', amount: 0, description: '' },
+    { category: 'other', amount: 0, description: '' },
+  ]
+}
 
 function getDefaultExpenses(): ExpenseDetailInput[] {
   return [
@@ -211,9 +187,8 @@ function resetForm() {
   formData.period_type = 'month'
   formData.period_start = ''
   formData.period_end = ''
-  formData.external_sales = 0
-  formData.internal_sales = 0
   formData.remark = ''
+  formData.income_details = getDefaultIncomes()
   formData.expenses = getDefaultExpenses()
   formData.labor = {
     normal_hours: 0,
@@ -251,16 +226,16 @@ async function handleSave() {
     period_type: formData.period_type,
     period_start: formData.period_start,
     period_end: formData.period_end,
-    external_sales: formData.external_sales,
-    internal_sales: formData.internal_sales,
     remark: formData.remark,
+    income_details: formData.income_details,
     expenses: formData.expenses,
     labor: formData.labor,
   }
 
   saving.value = true
   try {
-    await recordStore.save(input)
+    const recordId = isEdit.value ? Number(route.params.id) : null
+    await recordStore.save(recordId, input)
     ElMessage.success('保存成功')
     router.push('/')
   } catch (error: any) {
@@ -281,9 +256,12 @@ async function loadRecord() {
       formData.period_type = record.period_type
       formData.period_start = record.period_start
       formData.period_end = record.period_end
-      formData.external_sales = record.external_sales
-      formData.internal_sales = record.internal_sales
       formData.remark = record.remark
+      formData.income_details = (record.income_details || []).map((i) => ({
+        category: i.category,
+        amount: i.amount,
+        description: i.description,
+      }))
       formData.expenses = record.expenses.map((e) => ({
         category: e.category,
         amount: e.amount,
@@ -309,6 +287,7 @@ onMounted(async () => {
   if (isEdit.value) {
     await loadRecord()
   } else {
+    formData.income_details = getDefaultIncomes()
     formData.expenses = getDefaultExpenses()
   }
 })

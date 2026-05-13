@@ -35,6 +35,7 @@ declare module 'vue' {
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
     ExpenseEditor: typeof import('./src/components/ExpenseEditor.vue')['default']
+    IncomeEditor: typeof import('./src/components/IncomeEditor.vue')['default']
     LaborTimeEditor: typeof import('./src/components/LaborTimeEditor.vue')['default']
     ResultPreview: typeof import('./src/components/ResultPreview.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

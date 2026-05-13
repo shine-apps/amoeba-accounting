@@ -5,10 +5,11 @@ use super::styles;
 
 /// 将核算记录导出为 Excel 文件
 ///
-/// 包含3个Sheet：
+/// 包含4个Sheet：
 /// 1. 核算表 - 主核算数据
-/// 2. 费用明细 - 各记录的费用明细
-/// 3. 趋势分析 - 各期间的指标趋势
+/// 2. 收入明细 - 各记录的收入明细
+/// 3. 费用明细 - 各记录的费用明细
+/// 4. 趋势分析 - 各期间的指标趋势
 pub fn write_excel(
     records: &[AccountingRecord],
     amoeba: &Amoeba,
@@ -23,19 +24,26 @@ pub fn write_excel(
         .map_err(|e| format!("创建工作表失败: {}", e))?;
     write_accounting_sheet(sheet1, records, amoeba)?;
 
-    // Sheet2: 费用明细
+    // Sheet2: 收入明细
     let sheet2 = workbook
+        .add_worksheet()
+        .set_name("收入明细")
+        .map_err(|e| format!("创建工作表失败: {}", e))?;
+    write_income_sheet(sheet2, records, amoeba)?;
+
+    // Sheet3: 费用明细
+    let sheet3 = workbook
         .add_worksheet()
         .set_name("费用明细")
         .map_err(|e| format!("创建工作表失败: {}", e))?;
-    write_expense_sheet(sheet2, records, amoeba)?;
+    write_expense_sheet(sheet3, records, amoeba)?;
 
-    // Sheet3: 趋势分析
-    let sheet3 = workbook
+    // Sheet4: 趋势分析
+    let sheet4 = workbook
         .add_worksheet()
         .set_name("趋势分析")
         .map_err(|e| format!("创建工作表失败: {}", e))?;
-    write_trend_sheet(sheet3, records, amoeba)?;
+    write_trend_sheet(sheet4, records, amoeba)?;
 
     // 保存文件
     workbook
@@ -154,14 +162,17 @@ fn write_accounting_sheet(
             None => continue,
         };
 
+        let external_sales = get_income_by_category(record, "external_sales");
+        let internal_sales = get_income_by_category(record, "internal_sales");
+
         sheet
             .write_string_with_format(row, 0, &record.period_start, &normal_fmt)
             .map_err(|e| format!("写入数据失败: {}", e))?;
         sheet
-            .write_number_with_format(row, 1, record.external_sales, &money_fmt)
+            .write_number_with_format(row, 1, external_sales, &money_fmt)
             .map_err(|e| format!("写入数据失败: {}", e))?;
         sheet
-            .write_number_with_format(row, 2, record.internal_sales, &money_fmt)
+            .write_number_with_format(row, 2, internal_sales, &money_fmt)
             .map_err(|e| format!("写入数据失败: {}", e))?;
         sheet
             .write_number_with_format(row, 3, result.total_sales, &money_fmt)
@@ -207,8 +218,8 @@ fn write_accounting_sheet(
             .write_number_with_format(row, 11, result.expense_rate, &percent_fmt)
             .map_err(|e| format!("写入数据失败: {}", e))?;
 
-        sum_external_sales += record.external_sales;
-        sum_internal_sales += record.internal_sales;
+        sum_external_sales += external_sales;
+        sum_internal_sales += internal_sales;
         sum_total_sales += result.total_sales;
         sum_total_expense += result.total_expense;
         sum_added_value += result.added_value;
@@ -290,7 +301,64 @@ fn write_accounting_sheet(
     Ok(())
 }
 
-/// Sheet2: 费用明细
+/// 从收入明细中获取指定分类的金额
+fn get_income_by_category(record: &AccountingRecord, category: &str) -> f64 {
+    record.income_details.iter()
+        .find(|i| i.category == category)
+        .map(|i| i.amount)
+        .unwrap_or(0.0)
+}
+
+/// Sheet2: 收入明细
+fn write_income_sheet(
+    sheet: &mut Worksheet,
+    records: &[AccountingRecord],
+    amoeba: &Amoeba,
+) -> Result<(), String> {
+    let title_fmt = styles::title_format();
+    let header_fmt = styles::header_format();
+    let normal_fmt = styles::normal_format();
+    let normal_left_fmt = styles::normal_left_format();
+    let money_fmt = styles::money_format();
+    let neg_money_fmt = styles::negative_money_format();
+
+    sheet.set_column_width(0, 14).map_err(|e| format!("设置列宽失败: {}", e))?;
+    sheet.set_column_width(1, 20).map_err(|e| format!("设置列宽失败: {}", e))?;
+    sheet.set_column_width(2, 16).map_err(|e| format!("设置列宽失败: {}", e))?;
+    sheet.set_column_width(3, 30).map_err(|e| format!("设置列宽失败: {}", e))?;
+
+    let title = format!("{} - 收入明细", amoeba.name);
+    sheet.merge_range(0, 0, 0, 3, title.as_str(), &title_fmt)
+        .map_err(|e| format!("写入标题失败: {}", e))?;
+
+    let headers = ["期间", "收入分类", "金额", "说明"];
+    for (col, header) in headers.iter().enumerate() {
+        sheet.write_string_with_format(1, col as u16, *header, &header_fmt)
+            .map_err(|e| format!("写入表头失败: {}", e))?;
+    }
+
+    let mut row = 2u32;
+    for record in records {
+        for income in &record.income_details {
+            sheet.write_string_with_format(row, 0, &record.period_start, &normal_fmt)
+                .map_err(|e| format!("写入数据失败: {}", e))?;
+            sheet.write_string_with_format(row, 1, &income.category, &normal_left_fmt)
+                .map_err(|e| format!("写入数据失败: {}", e))?;
+
+            let fmt = if income.amount < 0.0 { &neg_money_fmt } else { &money_fmt };
+            sheet.write_number_with_format(row, 2, income.amount, fmt)
+                .map_err(|e| format!("写入数据失败: {}", e))?;
+            sheet.write_string_with_format(row, 3, &income.description, &normal_left_fmt)
+                .map_err(|e| format!("写入数据失败: {}", e))?;
+
+            row += 1;
+        }
+    }
+
+    Ok(())
+}
+
+/// Sheet3: 费用明细
 fn write_expense_sheet(
     sheet: &mut Worksheet,
     records: &[AccountingRecord],
@@ -357,7 +425,7 @@ fn write_expense_sheet(
     Ok(())
 }
 
-/// Sheet3: 趋势分析
+/// Sheet4: 趋势分析
 fn write_trend_sheet(
     sheet: &mut Worksheet,
     records: &[AccountingRecord],

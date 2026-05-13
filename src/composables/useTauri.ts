@@ -29,8 +29,8 @@ export function useTauri() {
     return invoke<AccountingRecord>('get_record', { id })
   }
 
-  async function saveRecord(input: RecordInput): Promise<AccountingRecord> {
-    return invoke<AccountingRecord>('save_record', { input })
+  async function saveRecord(recordId: number | null, input: RecordInput): Promise<AccountingRecord> {
+    return invoke<AccountingRecord>('save_record', { recordId, input })
   }
 
   async function deleteRecord(id: number): Promise<void> {

@@ -1,5 +1,6 @@
 use crate::models::accounting_record::{AccountingRecord, AccountingResult};
 use crate::models::expense_detail::ExpenseDetail;
+use crate::models::income_detail::IncomeDetail;
 use crate::models::labor_time::LaborTime;
 
 /// 多维度汇总 - 将多条核算记录按周期类型汇总
@@ -27,6 +28,12 @@ pub fn aggregate_records(records: &[AccountingRecord], period_type: &str) -> Vec
         .map(|(period_start, group)| {
             let total_external_sales: f64 = group.iter().map(|r| r.external_sales).sum();
             let total_internal_sales: f64 = group.iter().map(|r| r.internal_sales).sum();
+
+            let total_income: f64 = group
+                .iter()
+                .flat_map(|r| r.income_details.iter())
+                .map(|i| i.amount)
+                .sum();
             let total_expense: f64 = group
                 .iter()
                 .flat_map(|r| r.expenses.iter())
@@ -37,7 +44,7 @@ pub fn aggregate_records(records: &[AccountingRecord], period_type: &str) -> Vec
             let total_public_hours: f64 = group.iter().map(|r| r.labor.public_hours).sum();
             let max_headcount: i32 = group.iter().map(|r| r.labor.headcount).max().unwrap_or(1);
 
-            let total_sales = total_external_sales + total_internal_sales;
+            let total_sales = total_income;
             let added_value = total_sales - total_expense;
             let total_hours = total_normal_hours + total_overtime_hours + total_public_hours;
             let headcount = if max_headcount > 0 { max_headcount as f64 } else { 1.0 };
@@ -60,13 +67,34 @@ pub fn aggregate_records(records: &[AccountingRecord], period_type: &str) -> Vec
                 0.0
             };
 
+            // 合并所有收入明细
+            let all_incomes: Vec<IncomeDetail> = group
+                .iter()
+                .flat_map(|r| r.income_details.clone())
+                .collect();
+
+            let mut income_map: std::collections::HashMap<String, f64> =
+                std::collections::HashMap::new();
+            for income in &all_incomes {
+                *income_map.entry(income.category.clone()).or_insert(0.0) += income.amount;
+            }
+            let aggregated_incomes: Vec<IncomeDetail> = income_map
+                .into_iter()
+                .map(|(category, amount)| IncomeDetail {
+                    id: None,
+                    record_id: None,
+                    category,
+                    amount,
+                    description: String::new(),
+                })
+                .collect();
+
             // 合并所有费用明细
             let all_expenses: Vec<ExpenseDetail> = group
                 .iter()
                 .flat_map(|r| r.expenses.clone())
                 .collect();
 
-            // 按分类汇总费用
             let mut expense_map: std::collections::HashMap<String, f64> =
                 std::collections::HashMap::new();
             for expense in &all_expenses {
@@ -102,6 +130,7 @@ pub fn aggregate_records(records: &[AccountingRecord], period_type: &str) -> Vec
                 remark: format!("汇总 {} 条记录", group.len()),
                 created_at: String::new(),
                 updated_at: String::new(),
+                income_details: aggregated_incomes,
                 expenses: aggregated_expenses,
                 labor: LaborTime {
                     id: None,

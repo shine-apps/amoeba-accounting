@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use tauri::State;
 use crate::models::accounting_record::{AccountingRecord, AccountingResult, RecordInput};
 use crate::models::labor_time::LaborTime;
-use crate::repository::{record_repo, expense_repo, labor_repo};
+use crate::repository::{record_repo, expense_repo, income_repo, labor_repo};
 use crate::services::{calculate, validate_record};
 
 pub fn list_records_inner(conn: &Connection, amoeba_id: i64) -> Result<Vec<AccountingRecord>, String> {
@@ -22,7 +22,7 @@ pub fn save_record_inner(
 ) -> Result<AccountingResult, String> {
     validate_record(input)?;
 
-    let result = calculate(&input.expenses, &input.labor, input.external_sales, input.internal_sales);
+    let result = calculate(&input.income_details, &input.expenses, &input.labor);
 
     match record_id {
         Some(id) if id > 0 => {
@@ -36,11 +36,12 @@ pub fn save_record_inner(
                 period_type: input.period_type.clone(),
                 period_start: input.period_start.clone(),
                 period_end: input.period_end.clone(),
-                external_sales: input.external_sales,
-                internal_sales: input.internal_sales,
+                external_sales: 0.0,
+                internal_sales: 0.0,
                 remark: input.remark.clone(),
                 created_at: existing.created_at,
                 updated_at: String::new(),
+                income_details: vec![],
                 expenses: vec![],
                 labor: LaborTime {
                     id: None,
@@ -55,6 +56,11 @@ pub fn save_record_inner(
 
             record_repo::update(conn, &record, &result)
                 .map_err(|e| format!("更新核算记录失败: {}", e))?;
+
+            income_repo::delete_by_record(conn, id)
+                .map_err(|e| format!("删除旧收入明细失败: {}", e))?;
+            income_repo::insert_batch(conn, id, &input.income_details)
+                .map_err(|e| format!("插入收入明细失败: {}", e))?;
 
             expense_repo::delete_by_record(conn, id)
                 .map_err(|e| format!("删除旧费用明细失败: {}", e))?;
@@ -71,11 +77,12 @@ pub fn save_record_inner(
                 period_type: input.period_type.clone(),
                 period_start: input.period_start.clone(),
                 period_end: input.period_end.clone(),
-                external_sales: input.external_sales,
-                internal_sales: input.internal_sales,
+                external_sales: 0.0,
+                internal_sales: 0.0,
                 remark: input.remark.clone(),
                 created_at: String::new(),
                 updated_at: String::new(),
+                income_details: vec![],
                 expenses: vec![],
                 labor: LaborTime {
                     id: None,
@@ -90,6 +97,9 @@ pub fn save_record_inner(
 
             let new_id = record_repo::insert(conn, &record, &result)
                 .map_err(|e| format!("插入核算记录失败: {}", e))?;
+
+            income_repo::insert_batch(conn, new_id, &input.income_details)
+                .map_err(|e| format!("插入收入明细失败: {}", e))?;
 
             expense_repo::insert_batch(conn, new_id, &input.expenses)
                 .map_err(|e| format!("插入费用明细失败: {}", e))?;

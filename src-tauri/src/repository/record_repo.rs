@@ -1,7 +1,7 @@
 use rusqlite::{params, Connection, Result, OptionalExtension};
 use crate::models::accounting_record::{AccountingRecord, AccountingResult};
 use crate::models::labor_time::LaborTime;
-use super::{expense_repo, labor_repo};
+use super::{expense_repo, income_repo, labor_repo};
 
 /// 获取某个阿米巴的所有核算记录
 pub fn list_by_amoeba(conn: &Connection, amoeba_id: i64) -> Result<Vec<AccountingRecord>> {
@@ -28,6 +28,7 @@ pub fn list_by_amoeba(conn: &Connection, amoeba_id: i64) -> Result<Vec<Accountin
                 remark: row.get(7)?,
                 created_at: row.get(8)?,
                 updated_at: row.get(9)?,
+                income_details: vec![],
                 expenses: vec![],
                 labor: LaborTime {
                     id: None,
@@ -56,6 +57,7 @@ pub fn list_by_amoeba(conn: &Connection, amoeba_id: i64) -> Result<Vec<Accountin
     let mut result = Vec::with_capacity(records.len());
     for mut record in records {
         let record_id = record.id.unwrap();
+        record.income_details = income_repo::list_by_record(conn, record_id)?;
         record.expenses = expense_repo::list_by_record(conn, record_id)?;
         record.labor = labor_repo::get_by_record(conn, record_id)?.unwrap_or(LaborTime {
             id: None,
@@ -95,6 +97,7 @@ pub fn get_with_details(conn: &Connection, id: i64) -> Result<Option<AccountingR
                 remark: row.get(7)?,
                 created_at: row.get(8)?,
                 updated_at: row.get(9)?,
+                income_details: vec![],
                 expenses: vec![],
                 labor: LaborTime {
                     id: None,
@@ -125,6 +128,7 @@ pub fn get_with_details(conn: &Connection, id: i64) -> Result<Option<AccountingR
     };
 
     let record_id = record.id.unwrap();
+    record.income_details = income_repo::list_by_record(conn, record_id)?;
     record.expenses = expense_repo::list_by_record(conn, record_id)?;
     record.labor = labor_repo::get_by_record(conn, record_id)?.unwrap_or(LaborTime {
         id: None,
@@ -243,6 +247,7 @@ pub fn query_by_period(
                 remark: row.get(7)?,
                 created_at: row.get(8)?,
                 updated_at: row.get(9)?,
+                income_details: vec![],
                 expenses: vec![],
                 labor: LaborTime {
                     id: None,
@@ -271,6 +276,7 @@ pub fn query_by_period(
     let mut result = Vec::with_capacity(records.len());
     for mut record in records {
         let record_id = record.id.unwrap();
+        record.income_details = income_repo::list_by_record(conn, record_id)?;
         record.expenses = expense_repo::list_by_record(conn, record_id)?;
         record.labor = labor_repo::get_by_record(conn, record_id)?.unwrap_or(LaborTime {
             id: None,

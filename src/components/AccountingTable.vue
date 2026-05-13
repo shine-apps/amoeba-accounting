@@ -38,7 +38,7 @@
 import { computed } from 'vue'
 import type { AccountingRecord } from '@/types/record'
 import { formatMoney, formatPercent } from '@/utils/format'
-import { EXPENSE_CATEGORIES } from '@/utils/constants'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/utils/constants'
 
 interface TableRow {
   item: string
@@ -57,6 +57,12 @@ const props = withDefaults(defineProps<{
 }>(), {
   showComparison: false,
 })
+
+function getIncomeByCategory(record: AccountingRecord, categoryCode: string): number {
+  if (!record.income_details || record.income_details.length === 0) return 0
+  const income = record.income_details.find((i) => i.category === categoryCode)
+  return income ? income.amount : 0
+}
 
 function getExpenseByCategory(record: AccountingRecord, categoryCode: string): number {
   if (!record.expenses || record.expenses.length === 0) return 0
@@ -101,11 +107,16 @@ const tableData = computed<TableRow[]>(() => {
 
   // 销售收入
   rows.push(buildRow('销售收入', 0, undefined, 'money', false, 'section'))
-  rows.push(buildRow('  对外销售额', current.external_sales, previous?.external_sales, 'money'))
-  rows.push(buildRow('  内部交易额', current.internal_sales, previous?.internal_sales, 'money'))
-  const currentTotalSales = current.external_sales + current.internal_sales
-  const prevTotalSales = previous ? previous.external_sales + previous.internal_sales : undefined
-  rows.push(buildRow('  总销售额', currentTotalSales, prevTotalSales, 'money', false, 'total'))
+  let currentTotalSales = 0
+  let prevTotalSales = 0
+  INCOME_CATEGORIES.forEach((cat) => {
+    const cur = getIncomeByCategory(current, cat.code)
+    currentTotalSales += cur
+    const prev = previous ? getIncomeByCategory(previous, cat.code) : undefined
+    if (prev !== undefined) prevTotalSales += prev
+    rows.push(buildRow(`  ${cat.name}`, cur, prev, 'money'))
+  })
+  rows.push(buildRow('  总销售额', currentTotalSales, previous ? prevTotalSales : undefined, 'money', false, 'total'))
 
   // 费用
   rows.push(buildRow('费用', 0, undefined, 'money', false, 'section'))
@@ -187,11 +198,9 @@ function formatChange(row: TableRow): string {
 
 function getChangeClass(row: TableRow): string {
   if (row.change === undefined || row.change === null) return ''
-  // 对于费用率，下降是好的
   if (row.item.includes('费用率')) {
     return row.change < 0 ? 'positive-change' : 'negative-change'
   }
-  // 对于单位时间附加值、附加值率等，上升是好的
   if (row.change > 0) return 'positive-change'
   if (row.change < 0) return 'negative-change'
   return ''

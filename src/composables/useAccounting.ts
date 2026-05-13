@@ -1,13 +1,12 @@
-import type { AccountingResult, ExpenseDetailInput, LaborTimeInput } from '@/types/accounting'
+import type { AccountingResult, ExpenseDetailInput, IncomeDetailInput, LaborTimeInput } from '@/types/accounting'
 
 export function useAccounting() {
   const calculate = (
+    incomeDetails: IncomeDetailInput[],
     expenses: ExpenseDetailInput[],
     labor: LaborTimeInput,
-    externalSales: number,
-    internalSales: number
   ): AccountingResult => {
-    const totalSales = externalSales + internalSales
+    const totalSales = incomeDetails.reduce((sum, i) => sum + i.amount, 0)
     const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0)
     const addedValue = totalSales - totalExpense
     const totalHours = labor.normal_hours + labor.overtime_hours + labor.public_hours

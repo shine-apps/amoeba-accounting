@@ -29,8 +29,8 @@ export const useRecordStore = defineStore('record', () => {
     }
   }
 
-  async function save(input: RecordInput) {
-    const record = await saveRecord(input)
+  async function save(recordId: number | null, input: RecordInput) {
+    const record = await saveRecord(recordId, input)
     const index = records.value.findIndex((r) => r.id === record.id)
     if (index !== -1) {
       records.value[index] = record
