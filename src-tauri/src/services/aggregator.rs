@@ -73,7 +73,7 @@ pub fn aggregate_records(records: &[AccountingRecord], period_type: &str) -> Vec
                 .flat_map(|r| r.income_details.clone())
                 .collect();
 
-            let mut income_map: std::collections::HashMap<String, f64> =
+            let mut income_map: std::collections::HashMap<i64, f64> =
                 std::collections::HashMap::new();
             for income in &all_incomes {
                 *income_map.entry(income.category.clone()).or_insert(0.0) += income.amount;
@@ -95,7 +95,7 @@ pub fn aggregate_records(records: &[AccountingRecord], period_type: &str) -> Vec
                 .flat_map(|r| r.expenses.clone())
                 .collect();
 
-            let mut expense_map: std::collections::HashMap<String, f64> =
+            let mut expense_map: std::collections::HashMap<i64, f64> =
                 std::collections::HashMap::new();
             for expense in &all_expenses {
                 *expense_map.entry(expense.category.clone()).or_insert(0.0) += expense.amount;

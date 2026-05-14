@@ -1,10 +1,12 @@
 pub mod amoeba;
+pub mod amoeba_category;
 pub mod accounting_record;
 pub mod expense_detail;
 pub mod income_detail;
 pub mod labor_time;
 
 pub use amoeba::{Amoeba, AmoebaInput};
+pub use amoeba_category::{AmoebaCategory, AmoebaCategoryInput, CategoryList, SaveCategoriesInput};
 pub use accounting_record::{AccountingRecord, AccountingResult, RecordInput};
 pub use expense_detail::{ExpenseDetail, ExpenseDetailInput};
 pub use income_detail::{IncomeDetail, IncomeDetailInput};

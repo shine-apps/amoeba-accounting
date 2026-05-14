@@ -3,6 +3,7 @@ use rusqlite::Connection;
 use tauri::State;
 use crate::models::amoeba::{Amoeba, AmoebaInput};
 use crate::repository::amoeba_repo;
+use crate::repository::category_repo;
 
 pub fn list_amoebas_inner(conn: &Connection) -> Result<Vec<Amoeba>, String> {
     amoeba_repo::list(conn).map_err(|e| format!("查询阿米巴列表失败: {}", e))
@@ -19,7 +20,11 @@ pub fn create_amoeba_inner(conn: &Connection, input: &AmoebaInput) -> Result<Amo
             valid_types.join(", ")
         ));
     }
-    amoeba_repo::insert(conn, input).map_err(|e| format!("创建阿米巴组织失败: {}", e))
+    let amoeba = amoeba_repo::insert(conn, input).map_err(|e| format!("创建阿米巴组织失败: {}", e))?;
+    let amoeba_id = amoeba.id.unwrap();
+    category_repo::seed_defaults(conn, amoeba_id)
+        .map_err(|e| format!("播种默认类别失败: {}", e))?;
+    Ok(amoeba)
 }
 
 pub fn update_amoeba_inner(conn: &Connection, id: i64, input: &AmoebaInput) -> Result<Amoeba, String> {

@@ -38,8 +38,6 @@
 import { computed } from 'vue'
 import type { AccountingRecord } from '@/types/record'
 import { formatMoney, formatPercent } from '@/utils/format'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/utils/constants'
-
 interface TableRow {
   item: string
   current: number
@@ -54,19 +52,21 @@ interface TableRow {
 const props = withDefaults(defineProps<{
   records: AccountingRecord[]
   showComparison?: boolean
+  incomeCategories: Array<{ id: number; name: string }>
+  expenseCategories: Array<{ id: number; name: string }>
 }>(), {
   showComparison: false,
 })
 
-function getIncomeByCategory(record: AccountingRecord, categoryCode: string): number {
+function getIncomeByCategory(record: AccountingRecord, categoryId: number): number {
   if (!record.income_details || record.income_details.length === 0) return 0
-  const income = record.income_details.find((i) => i.category === categoryCode)
+  const income = record.income_details.find((i) => i.category === categoryId)
   return income ? income.amount : 0
 }
 
-function getExpenseByCategory(record: AccountingRecord, categoryCode: string): number {
+function getExpenseByCategory(record: AccountingRecord, categoryId: number): number {
   if (!record.expenses || record.expenses.length === 0) return 0
-  const expense = record.expenses.find((e) => e.category === categoryCode)
+  const expense = record.expenses.find((e) => e.category === categoryId)
   return expense ? expense.amount : 0
 }
 
@@ -109,10 +109,10 @@ const tableData = computed<TableRow[]>(() => {
   rows.push(buildRow('销售收入', 0, undefined, 'money', false, 'section'))
   let currentTotalSales = 0
   let prevTotalSales = 0
-  INCOME_CATEGORIES.forEach((cat) => {
-    const cur = getIncomeByCategory(current, cat.code)
+  props.incomeCategories.forEach((cat) => {
+    const cur = getIncomeByCategory(current, cat.id)
     currentTotalSales += cur
-    const prev = previous ? getIncomeByCategory(previous, cat.code) : undefined
+    const prev = previous ? getIncomeByCategory(previous, cat.id) : undefined
     if (prev !== undefined) prevTotalSales += prev
     rows.push(buildRow(`  ${cat.name}`, cur, prev, 'money'))
   })
@@ -122,10 +122,10 @@ const tableData = computed<TableRow[]>(() => {
   rows.push(buildRow('费用', 0, undefined, 'money', false, 'section'))
   let currentTotalExpense = 0
   let prevTotalExpense = 0
-  EXPENSE_CATEGORIES.forEach((cat) => {
-    const cur = getExpenseByCategory(current, cat.code)
+  props.expenseCategories.forEach((cat) => {
+    const cur = getExpenseByCategory(current, cat.id)
     currentTotalExpense += cur
-    const prev = previous ? getExpenseByCategory(previous, cat.code) : undefined
+    const prev = previous ? getExpenseByCategory(previous, cat.id) : undefined
     if (prev !== undefined) prevTotalExpense += prev
     rows.push(buildRow(`  ${cat.name}`, cur, prev, 'money'))
   })

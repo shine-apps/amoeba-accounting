@@ -11,12 +11,17 @@ mod tests {
     use amoeba_accounting::repository::expense_repo;
     use amoeba_accounting::repository::income_repo;
     use amoeba_accounting::repository::labor_repo;
+    use amoeba_accounting::repository::category_repo;
     use amoeba_accounting::services::calculator;
     use amoeba_accounting::services::validator;
     use amoeba_accounting::services::aggregator;
     use amoeba_accounting::commands::amoeba_cmd;
     use amoeba_accounting::commands::record_cmd;
     use amoeba_accounting::commands::export_cmd;
+    use amoeba_accounting::commands::category_cmd;
+    use amoeba_accounting::models::amoeba_category::{
+        AmoebaCategoryInput, SaveCategoriesInput,
+    };
     use rusqlite::Connection;
 
     // ============================================================
@@ -38,13 +43,13 @@ mod tests {
         #[test]
         fn test_standard_calculation() {
             let income_details = vec![
-                IncomeDetailInput { category: "external_sales".into(), amount: 800_000.0, description: "对外".into() },
-                IncomeDetailInput { category: "internal_sales".into(), amount: 200_000.0, description: "内部".into() },
+                IncomeDetailInput { category: 1, amount: 800_000.0, description: "对外".into() },
+                IncomeDetailInput { category: 2, amount: 200_000.0, description: "内部".into() },
             ];
             let expenses = vec![
-                ExpenseDetailInput { category: "material".into(), amount: 400000.0, description: "原材料".into() },
-                ExpenseDetailInput { category: "electricity".into(), amount: 50000.0, description: "电费".into() },
-                ExpenseDetailInput { category: "depreciation".into(), amount: 30000.0, description: "折旧".into() },
+                ExpenseDetailInput { category: 1, amount: 400000.0, description: "原材料".into() },
+                ExpenseDetailInput { category: 3, amount: 50000.0, description: "电费".into() },
+                ExpenseDetailInput { category: 4, amount: 30000.0, description: "折旧".into() },
             ];
             let labor = LaborTimeInput {
                 normal_hours: 800.0,
@@ -70,7 +75,7 @@ mod tests {
         fn test_zero_sales() {
             let income_details: Vec<IncomeDetailInput> = vec![];
             let expenses = vec![
-                ExpenseDetailInput { category: "material".into(), amount: 1000.0, description: "".into() },
+                ExpenseDetailInput { category: 1, amount: 1000.0, description: "".into() },
             ];
             let labor = LaborTimeInput {
                 normal_hours: 100.0,
@@ -92,7 +97,7 @@ mod tests {
         #[test]
         fn test_zero_hours() {
             let income_details = vec![
-                IncomeDetailInput { category: "external_sales".into(), amount: 10000.0, description: "".into() },
+                IncomeDetailInput { category: 1, amount: 10000.0, description: "".into() },
             ];
             let expenses = vec![];
             let labor = LaborTimeInput {
@@ -111,7 +116,7 @@ mod tests {
         #[test]
         fn test_no_expenses() {
             let income_details = vec![
-                IncomeDetailInput { category: "external_sales".into(), amount: 50000.0, description: "".into() },
+                IncomeDetailInput { category: 1, amount: 50000.0, description: "".into() },
             ];
             let expenses: Vec<ExpenseDetailInput> = vec![];
             let labor = LaborTimeInput {
@@ -131,10 +136,10 @@ mod tests {
         #[test]
         fn test_negative_added_value() {
             let income_details = vec![
-                IncomeDetailInput { category: "external_sales".into(), amount: 500000.0, description: "".into() },
+                IncomeDetailInput { category: 1, amount: 500000.0, description: "".into() },
             ];
             let expenses = vec![
-                ExpenseDetailInput { category: "material".into(), amount: 900000.0, description: "".into() },
+                ExpenseDetailInput { category: 1, amount: 900000.0, description: "".into() },
             ];
             let labor = LaborTimeInput {
                 normal_hours: 500.0,
@@ -165,11 +170,11 @@ mod tests {
                 period_end: "2026-05-31".into(),
                 remark: "".into(),
                 income_details: vec![
-                    IncomeDetailInput { category: "external_sales".into(), amount: 100000.0, description: "".into() },
-                    IncomeDetailInput { category: "internal_sales".into(), amount: 50000.0, description: "".into() },
+                    IncomeDetailInput { category: 1, amount: 100000.0, description: "".into() },
+                    IncomeDetailInput { category: 2, amount: 50000.0, description: "".into() },
                 ],
                 expenses: vec![
-                    ExpenseDetailInput { category: "material".into(), amount: 30000.0, description: "".into() },
+                    ExpenseDetailInput { category: 1, amount: 30000.0, description: "".into() },
                 ],
                 labor: LaborTimeInput {
                     normal_hours: 160.0,
@@ -242,7 +247,7 @@ mod tests {
         #[test]
         fn test_empty_income_category() {
             let mut input = valid_input();
-            input.income_details[0].category = "".into();
+            input.income_details[0].category = 0;
             assert!(validator::validate_record(&input).is_err());
         }
 
@@ -256,7 +261,7 @@ mod tests {
         #[test]
         fn test_empty_expense_category() {
             let mut input = valid_input();
-            input.expenses[0].category = "".into();
+            input.expenses[0].category = 0;
             assert!(validator::validate_record(&input).is_err());
         }
 
@@ -413,13 +418,13 @@ mod tests {
             assert!(record_id > 0);
 
             expense_repo::insert_batch(&conn, record_id, &[
-                ExpenseDetailInput { category: "material".into(), amount: 400_000.0, description: "原材料".into() },
-                ExpenseDetailInput { category: "electricity".into(), amount: 50_000.0, description: "电费".into() },
+                ExpenseDetailInput { category: 1, amount: 400_000.0, description: "原材料".into() },
+                ExpenseDetailInput { category: 3, amount: 50_000.0, description: "电费".into() },
             ]).unwrap();
 
             income_repo::insert_batch(&conn, record_id, &[
-                IncomeDetailInput { category: "external_sales".into(), amount: 800_000.0, description: "".into() },
-                IncomeDetailInput { category: "internal_sales".into(), amount: 200_000.0, description: "".into() },
+                IncomeDetailInput { category: 1, amount: 800_000.0, description: "".into() },
+                IncomeDetailInput { category: 2, amount: 200_000.0, description: "".into() },
             ]).unwrap();
 
             labor_repo::insert(&conn, record_id, &LaborTimeInput {
@@ -497,10 +502,10 @@ mod tests {
             };
             let record_id = record_repo::insert(&conn, &record, &record.result.as_ref().unwrap()).unwrap();
             expense_repo::insert_batch(&conn, record_id, &[
-                ExpenseDetailInput { category: "material".into(), amount: 50.0, description: "".into() },
+                ExpenseDetailInput { category: 1, amount: 50.0, description: "".into() },
             ]).unwrap();
             income_repo::insert_batch(&conn, record_id, &[
-                IncomeDetailInput { category: "external_sales".into(), amount: 100.0, description: "".into() },
+                IncomeDetailInput { category: 1, amount: 100.0, description: "".into() },
             ]).unwrap();
             labor_repo::insert(&conn, record_id, &LaborTimeInput {
                 normal_hours: 10.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 1,
@@ -539,12 +544,12 @@ mod tests {
             }
         }
 
-        fn income_item(category: &str, amount: f64) -> IncomeDetail {
-            IncomeDetail { id: None, record_id: None, category: category.into(), amount, description: String::new() }
+        fn income_item(category: i64, amount: f64) -> IncomeDetail {
+            IncomeDetail { id: None, record_id: None, category, amount, description: String::new() }
         }
 
-        fn expense_item(category: &str, amount: f64) -> ExpenseDetail {
-            ExpenseDetail { id: None, record_id: None, category: category.into(), amount, description: String::new() }
+        fn expense_item(category: i64, amount: f64) -> ExpenseDetail {
+            ExpenseDetail { id: None, record_id: None, category, amount, description: String::new() }
         }
 
         fn basic_labor() -> LaborTime {
@@ -561,16 +566,16 @@ mod tests {
         fn test_aggregate_by_week() {
             let records = vec![
                 make_record(1, "2026-05-05", "2026-05-05",
-                    vec![income_item("external_sales", 12000.0)],
-                    vec![expense_item("material", 3000.0)],
+                    vec![income_item(1, 12000.0)],
+                    vec![expense_item(1, 3000.0)],
                     basic_labor()),
                 make_record(1, "2026-05-06", "2026-05-06",
-                    vec![income_item("external_sales", 15000.0)],
-                    vec![expense_item("material", 4000.0)],
+                    vec![income_item(1, 15000.0)],
+                    vec![expense_item(1, 4000.0)],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 2.0, public_hours: 0.0, headcount: 2 }),
                 make_record(1, "2026-05-07", "2026-05-07",
-                    vec![income_item("external_sales", 9000.0)],
-                    vec![expense_item("material", 2000.0)],
+                    vec![income_item(1, 9000.0)],
+                    vec![expense_item(1, 2000.0)],
                     basic_labor()),
             ];
 
@@ -585,12 +590,12 @@ mod tests {
         fn test_aggregate_same_period() {
             let records = vec![
                 make_record(1, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 10000.0)],
-                    vec![expense_item("material", 3000.0)],
+                    vec![income_item(1, 10000.0)],
+                    vec![expense_item(1, 3000.0)],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 2 }),
                 make_record(1, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 15000.0), income_item("internal_sales", 5000.0)],
-                    vec![expense_item("material", 5000.0)],
+                    vec![income_item(1, 15000.0), income_item(2, 5000.0)],
+                    vec![expense_item(1, 5000.0)],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 2.0, public_hours: 0.0, headcount: 3 }),
             ];
 
@@ -600,9 +605,9 @@ mod tests {
             let agg = &aggregated[0];
             // 收入合并：external_sales: 10000+15000=25000, internal_sales: 5000
             assert_eq!(agg.income_details.len(), 2);
-            let ext = agg.income_details.iter().find(|i| i.category == "external_sales").unwrap();
+            let ext = agg.income_details.iter().find(|i| i.category == 1).unwrap();
             assert!((ext.amount - 25_000.0).abs() < 0.01);
-            let int = agg.income_details.iter().find(|i| i.category == "internal_sales").unwrap();
+            let int = agg.income_details.iter().find(|i| i.category == 2).unwrap();
             assert!((int.amount - 5_000.0).abs() < 0.01);
             // 费用合并：3000+5000=8000
             assert!((agg.expenses[0].amount - 8_000.0).abs() < 0.01);
@@ -828,12 +833,12 @@ mod tests {
                 period_end: "2026-05-31".into(),
                 remark: "5月核算".into(),
                 income_details: vec![
-                    IncomeDetailInput { category: "external_sales".into(), amount: 800_000.0, description: "对外".into() },
-                    IncomeDetailInput { category: "internal_sales".into(), amount: 200_000.0, description: "内部".into() },
+                    IncomeDetailInput { category: 1, amount: 800_000.0, description: "对外".into() },
+                    IncomeDetailInput { category: 2, amount: 200_000.0, description: "内部".into() },
                 ],
                 expenses: vec![
-                    ExpenseDetailInput { category: "material".into(), amount: 400_000.0, description: "原材料".into() },
-                    ExpenseDetailInput { category: "electricity".into(), amount: 50_000.0, description: "电费".into() },
+                    ExpenseDetailInput { category: 1, amount: 400_000.0, description: "原材料".into() },
+                    ExpenseDetailInput { category: 3, amount: 50_000.0, description: "电费".into() },
                 ],
                 labor: LaborTimeInput {
                     normal_hours: 800.0,
@@ -898,11 +903,11 @@ mod tests {
 
             let mut update_input = valid_record_input(amoeba_id);
             update_input.income_details = vec![
-                IncomeDetailInput { category: "external_sales".into(), amount: 900_000.0, description: "对外更新".into() },
-                IncomeDetailInput { category: "internal_sales".into(), amount: 100_000.0, description: "内部更新".into() },
+                IncomeDetailInput { category: 1, amount: 900_000.0, description: "对外更新".into() },
+                IncomeDetailInput { category: 2, amount: 100_000.0, description: "内部更新".into() },
             ];
             update_input.expenses = vec![
-                ExpenseDetailInput { category: "material".into(), amount: 300_000.0, description: "新原材料".into() },
+                ExpenseDetailInput { category: 1, amount: 300_000.0, description: "新原材料".into() },
             ];
             update_input.labor = LaborTimeInput {
                 normal_hours: 700.0,
@@ -919,7 +924,7 @@ mod tests {
             let updated = record_cmd::get_record_inner(&conn, record_id).unwrap().unwrap();
             assert_eq!(updated.income_details.len(), 2);
             assert_eq!(updated.expenses.len(), 1);
-            assert_eq!(updated.expenses[0].category, "material");
+            assert_eq!(updated.expenses[0].category, 1);
             assert_eq!(updated.expenses[0].description, "新原材料");
             assert!((updated.labor.normal_hours - 700.0).abs() < 0.01);
             assert!((updated.labor.overtime_hours - 150.0).abs() < 0.01);
@@ -958,18 +963,18 @@ mod tests {
 
             let mut update_input = valid_record_input(amoeba_id);
             update_input.income_details = vec![
-                IncomeDetailInput { category: "service".into(), amount: 500_000.0, description: "服务费".into() },
-                IncomeDetailInput { category: "other".into(), amount: 100_000.0, description: "其他".into() },
+                IncomeDetailInput { category: 3, amount: 500_000.0, description: "服务费".into() },
+                IncomeDetailInput { category: 4, amount: 100_000.0, description: "其他".into() },
             ];
 
             record_cmd::save_record_inner(&conn, Some(record_id), &update_input).unwrap();
 
             let updated = record_cmd::get_record_inner(&conn, record_id).unwrap().unwrap();
             assert_eq!(updated.income_details.len(), 2);
-            let categories: Vec<&str> = updated.income_details.iter().map(|i| i.category.as_str()).collect();
-            assert!(categories.contains(&"service"));
-            assert!(categories.contains(&"other"));
-            assert!(!categories.contains(&"external_sales"));
+            let categories: Vec<i64> = updated.income_details.iter().map(|i| i.category).collect();
+            assert!(categories.contains(&3));
+            assert!(categories.contains(&4));
+            assert!(!categories.contains(&1));
         }
 
         #[test]
@@ -984,20 +989,20 @@ mod tests {
 
             let mut update_input = valid_record_input(amoeba_id);
             update_input.expenses = vec![
-                ExpenseDetailInput { category: "rent".into(), amount: 100_000.0, description: "租金".into() },
-                ExpenseDetailInput { category: "travel".into(), amount: 20_000.0, description: "差旅".into() },
-                ExpenseDetailInput { category: "depreciation".into(), amount: 15_000.0, description: "折旧".into() },
+                ExpenseDetailInput { category: 101, amount: 100_000.0, description: "租金".into() },
+                ExpenseDetailInput { category: 9, amount: 20_000.0, description: "差旅".into() },
+                ExpenseDetailInput { category: 4, amount: 15_000.0, description: "折旧".into() },
             ];
 
             record_cmd::save_record_inner(&conn, Some(record_id), &update_input).unwrap();
 
             let updated = record_cmd::get_record_inner(&conn, record_id).unwrap().unwrap();
             assert_eq!(updated.expenses.len(), 3);
-            let categories: Vec<&str> = updated.expenses.iter().map(|e| e.category.as_str()).collect();
-            assert!(categories.contains(&"rent"));
-            assert!(categories.contains(&"travel"));
-            assert!(categories.contains(&"depreciation"));
-            assert!(!categories.contains(&"material"));
+            let categories: Vec<i64> = updated.expenses.iter().map(|e| e.category).collect();
+            assert!(categories.contains(&101));
+            assert!(categories.contains(&9));
+            assert!(categories.contains(&4));
+            assert!(!categories.contains(&1));
         }
 
         #[test]
@@ -1100,11 +1105,11 @@ mod tests {
                 period_end: "2026-05-31".into(),
                 remark: "导出测试".into(),
                 income_details: vec![
-                    IncomeDetailInput { category: "external_sales".into(), amount: 500_000.0, description: "对外".into() },
-                    IncomeDetailInput { category: "internal_sales".into(), amount: 100_000.0, description: "内部".into() },
+                    IncomeDetailInput { category: 1, amount: 500_000.0, description: "对外".into() },
+                    IncomeDetailInput { category: 2, amount: 100_000.0, description: "内部".into() },
                 ],
                 expenses: vec![
-                    ExpenseDetailInput { category: "material".into(), amount: 200_000.0, description: "原材料".into() },
+                    ExpenseDetailInput { category: 1, amount: 200_000.0, description: "原材料".into() },
                 ],
                 labor: LaborTimeInput {
                     normal_hours: 160.0,
@@ -1175,11 +1180,11 @@ mod tests {
                 period_end: "2026-06-30".into(),
                 remark: "6月核算".into(),
                 income_details: vec![
-                    IncomeDetailInput { category: "external_sales".into(), amount: 300_000.0, description: "".into() },
-                    IncomeDetailInput { category: "internal_sales".into(), amount: 50_000.0, description: "".into() },
+                    IncomeDetailInput { category: 1, amount: 300_000.0, description: "".into() },
+                    IncomeDetailInput { category: 2, amount: 50_000.0, description: "".into() },
                 ],
                 expenses: vec![
-                    ExpenseDetailInput { category: "material".into(), amount: 150_000.0, description: "原材料".into() },
+                    ExpenseDetailInput { category: 1, amount: 150_000.0, description: "原材料".into() },
                 ],
                 labor: LaborTimeInput {
                     normal_hours: 160.0,
@@ -1234,11 +1239,11 @@ mod tests {
                 period_end: "2026-05-31".into(),
                 remark: "".into(),
                 income_details: vec![
-                    IncomeDetailInput { category: "external_sales".into(), amount: 100_000.0, description: "".into() },
-                    IncomeDetailInput { category: "internal_sales".into(), amount: 50_000.0, description: "".into() },
+                    IncomeDetailInput { category: 1, amount: 100_000.0, description: "".into() },
+                    IncomeDetailInput { category: 2, amount: 50_000.0, description: "".into() },
                 ],
                 expenses: vec![
-                    ExpenseDetailInput { category: "material".into(), amount: 30_000.0, description: "".into() },
+                    ExpenseDetailInput { category: 1, amount: 30_000.0, description: "".into() },
                 ],
                 labor: LaborTimeInput {
                     normal_hours: 160.0,
@@ -1267,7 +1272,7 @@ mod tests {
         fn test_zero_sales_valid() {
             let mut input = valid_input();
             input.income_details = vec![
-                IncomeDetailInput { category: "external_sales".into(), amount: 0.0, description: "".into() },
+                IncomeDetailInput { category: 1, amount: 0.0, description: "".into() },
             ];
             assert!(validator::validate_record(&input).is_ok());
         }
@@ -1442,12 +1447,12 @@ mod tests {
                 period_end: "2026-05-31".into(),
                 remark: "测试".into(),
                 income_details: vec![
-                    IncomeDetailInput { category: "external_sales".into(), amount: 600_000.0, description: "对外销售".into() },
-                    IncomeDetailInput { category: "internal_sales".into(), amount: 150_000.0, description: "内部交易".into() },
+                    IncomeDetailInput { category: 1, amount: 600_000.0, description: "对外销售".into() },
+                    IncomeDetailInput { category: 2, amount: 150_000.0, description: "内部交易".into() },
                 ],
                 expenses: vec![
-                    ExpenseDetailInput { category: "material".into(), amount: 200_000.0, description: "原料".into() },
-                    ExpenseDetailInput { category: "electricity".into(), amount: 30_000.0, description: "电费".into() },
+                    ExpenseDetailInput { category: 1, amount: 200_000.0, description: "原料".into() },
+                    ExpenseDetailInput { category: 3, amount: 30_000.0, description: "电费".into() },
                 ],
                 labor: LaborTimeInput {
                     normal_hours: 160.0,
@@ -1565,7 +1570,7 @@ mod tests {
             let range = workbook.worksheet_range(&sheet_name).unwrap();
 
             let row2_category = range.get_value((2u32, 1)).unwrap().to_string();
-            assert!(row2_category == "external_sales" || row2_category == "internal_sales");
+            assert!(row2_category == "1" || row2_category == "2");
 
             std::fs::remove_file(&path).ok();
         }
@@ -1602,7 +1607,7 @@ mod tests {
             let range = workbook.worksheet_range(&sheet_name).unwrap();
 
             let row2_category = range.get_value((2u32, 1)).unwrap().to_string();
-            assert!(row2_category == "material" || row2_category == "electricity");
+            assert!(row2_category == "1" || row2_category == "3");
 
             let amount_cell = range.get_value((2u32, 2)).unwrap();
             let amount_str = amount_cell.to_string();
@@ -1662,19 +1667,19 @@ mod tests {
             }
         }
 
-        fn income_item(category: &str, amount: f64) -> IncomeDetail {
-            IncomeDetail { id: None, record_id: None, category: category.into(), amount, description: String::new() }
+        fn income_item(category: i64, amount: f64) -> IncomeDetail {
+            IncomeDetail { id: None, record_id: None, category, amount, description: String::new() }
         }
 
         #[test]
         fn test_aggregate_zero_headcount_uses_one() {
             let records = vec![
                 make_record(1, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 50000.0)],
+                    vec![income_item(1, 50000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 160.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 0 }),
                 make_record(1, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 50000.0)],
+                    vec![income_item(1, 50000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 160.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 0 }),
             ];
@@ -1691,11 +1696,11 @@ mod tests {
         fn test_aggregate_different_amoebas_same_period() {
             let records = vec![
                 make_record(1, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 10000.0)],
+                    vec![income_item(1, 10000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 2 }),
                 make_record(2, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 20000.0)],
+                    vec![income_item(1, 20000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 3 }),
             ];
@@ -1703,7 +1708,7 @@ mod tests {
             let aggregated = aggregator::aggregate_records(&records, "day");
             assert_eq!(aggregated.len(), 1);
             let agg = &aggregated[0];
-            let ext = agg.income_details.iter().find(|i| i.category == "external_sales").unwrap();
+            let ext = agg.income_details.iter().find(|i| i.category == 1).unwrap();
             assert!((ext.amount - 30_000.0).abs() < 0.01);
             assert_eq!(agg.labor.headcount, 3);
         }
@@ -1712,15 +1717,15 @@ mod tests {
         fn test_aggregate_multiple_periods_sorted() {
             let records = vec![
                 make_record(1, "2026-05-03", "2026-05-03",
-                    vec![income_item("external_sales", 30000.0)],
+                    vec![income_item(1, 30000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 1 }),
                 make_record(1, "2026-05-01", "2026-05-01",
-                    vec![income_item("external_sales", 10000.0)],
+                    vec![income_item(1, 10000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 1 }),
                 make_record(1, "2026-05-02", "2026-05-02",
-                    vec![income_item("external_sales", 20000.0)],
+                    vec![income_item(1, 20000.0)],
                     vec![],
                     LaborTime { id: None, record_id: None, normal_hours: 8.0, overtime_hours: 0.0, public_hours: 0.0, headcount: 1 }),
             ];
@@ -1730,6 +1735,232 @@ mod tests {
             assert_eq!(aggregated[0].period_start, "2026-05-01");
             assert_eq!(aggregated[1].period_start, "2026-05-02");
             assert_eq!(aggregated[2].period_start, "2026-05-03");
+        }
+    }
+
+    // ============================================================
+    // 类别命令层测试
+    // ============================================================
+    mod category_cmd_tests {
+        use super::*;
+
+        fn create_test_amoeba(conn: &Connection) -> i64 {
+            let input = AmoebaInput {
+                name: "测试阿米巴".into(),
+                amoeba_type: "生产型".into(),
+                leader: "测试".into(),
+                parent_id: None,
+            };
+            let amoeba = amoeba_repo::insert(conn, &input).unwrap();
+            let amoeba_id = amoeba.id.unwrap();
+            category_repo::seed_defaults(conn, amoeba_id).unwrap();
+            amoeba_id
+        }
+
+        #[test]
+        fn test_amoeba_has_default_categories() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            let result = category_cmd::get_categories_inner(&conn, amoeba_id).unwrap();
+            assert_eq!(result.income.len(), 4);
+            assert_eq!(result.expense.len(), 10);
+
+            assert_eq!(result.income[0].name, "对外销售");
+            assert_eq!(result.expense[0].name, "原材料费");
+        }
+
+        #[test]
+        fn test_save_categories_replaces_all() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            let input = SaveCategoriesInput {
+                income: vec![
+                    AmoebaCategoryInput {
+                        category_type: "income".into(),
+                        name: "自定义收入".into(),
+                        desc: "测试".into(),
+                        sort_order: 1,
+                    },
+                ],
+                expense: vec![
+                    AmoebaCategoryInput {
+                        category_type: "expense".into(),
+                        name: "自定义费用".into(),
+                        desc: "".into(),
+                        sort_order: 1,
+                    },
+                ],
+            };
+            category_cmd::save_categories_inner(&conn, amoeba_id, &input).unwrap();
+
+            let result = category_cmd::get_categories_inner(&conn, amoeba_id).unwrap();
+            assert_eq!(result.income.len(), 1);
+            assert_eq!(result.income[0].name, "自定义收入");
+            assert_eq!(result.expense.len(), 1);
+            assert_eq!(result.expense[0].name, "自定义费用");
+        }
+
+        #[test]
+        fn test_save_categories_empty_income() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            let input = SaveCategoriesInput {
+                income: vec![],
+                expense: vec![AmoebaCategoryInput {
+                    category_type: "expense".into(),
+                    name: "费用".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+            };
+            let err = category_cmd::save_categories_inner(&conn, amoeba_id, &input).unwrap_err();
+            assert!(err.contains("至少需要一个收入类别"));
+        }
+
+        #[test]
+        fn test_save_categories_empty_expense() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            let input = SaveCategoriesInput {
+                income: vec![AmoebaCategoryInput {
+                    category_type: "income".into(),
+                    name: "收入".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+                expense: vec![],
+            };
+            let err = category_cmd::save_categories_inner(&conn, amoeba_id, &input).unwrap_err();
+            assert!(err.contains("至少需要一个费用类别"));
+        }
+
+        #[test]
+        fn test_save_categories_empty_name() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            let input = SaveCategoriesInput {
+                income: vec![AmoebaCategoryInput {
+                    category_type: "income".into(),
+                    name: "".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+                expense: vec![AmoebaCategoryInput {
+                    category_type: "expense".into(),
+                    name: "费用".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+            };
+            let err = category_cmd::save_categories_inner(&conn, amoeba_id, &input).unwrap_err();
+            assert!(err.contains("名称不能为空"));
+        }
+
+        #[test]
+        fn test_reset_to_defaults() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            let input = SaveCategoriesInput {
+                income: vec![AmoebaCategoryInput {
+                    category_type: "income".into(),
+                    name: "自定义".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+                expense: vec![AmoebaCategoryInput {
+                    category_type: "expense".into(),
+                    name: "自定义".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+            };
+            category_cmd::save_categories_inner(&conn, amoeba_id, &input).unwrap();
+
+            let result = category_cmd::reset_categories_inner(&conn, amoeba_id).unwrap();
+            assert_eq!(result.income.len(), 4);
+            assert_eq!(result.expense.len(), 10);
+            assert_eq!(result.income[0].name, "对外销售");
+            assert_eq!(result.expense[0].name, "原材料费");
+        }
+
+        #[test]
+        fn test_categories_per_amoeba() {
+            let conn = setup_db();
+            let amoeba1 = create_test_amoeba(&conn);
+
+            let amoeba2 = amoeba_repo::insert(&conn, &AmoebaInput {
+                name: "第二阿米巴".into(),
+                amoeba_type: "营销型".into(),
+                leader: "测试".into(),
+                parent_id: None,
+            }).unwrap().id.unwrap();
+
+            let input1 = SaveCategoriesInput {
+                income: vec![AmoebaCategoryInput {
+                    category_type: "income".into(),
+                    name: "A收入".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+                expense: vec![AmoebaCategoryInput {
+                    category_type: "expense".into(),
+                    name: "A费用".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+            };
+            category_cmd::save_categories_inner(&conn, amoeba1, &input1).unwrap();
+
+            let input2 = SaveCategoriesInput {
+                income: vec![AmoebaCategoryInput {
+                    category_type: "income".into(),
+                    name: "B收入".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+                expense: vec![AmoebaCategoryInput {
+                    category_type: "expense".into(),
+                    name: "B费用".into(),
+                    desc: "".into(),
+                    sort_order: 1,
+                }],
+            };
+            category_cmd::save_categories_inner(&conn, amoeba2, &input2).unwrap();
+
+            let r1 = category_cmd::get_categories_inner(&conn, amoeba1).unwrap();
+            let r2 = category_cmd::get_categories_inner(&conn, amoeba2).unwrap();
+            assert_eq!(r1.income[0].name, "A收入");
+            assert_eq!(r2.income[0].name, "B收入");
+        }
+
+        #[test]
+        fn test_amoeba_cascade_delete() {
+            let conn = setup_db();
+            let amoeba_id = create_test_amoeba(&conn);
+
+            // verify categories exist (seeded during amoeba creation)
+            let cats = category_cmd::get_categories_inner(&conn, amoeba_id).unwrap();
+            assert!(!cats.income.is_empty());
+
+            // delete amoeba via direct SQL (amoeba_repo::delete may hold prepared statements)
+            conn.execute("DELETE FROM amoeba WHERE id = ?1", rusqlite::params![amoeba_id])
+                .unwrap();
+
+            // categories should be cascade deleted — query directly
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM amoeba_category WHERE amoeba_id = ?1",
+                    rusqlite::params![amoeba_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
+            assert_eq!(count, 0, "categories should be cascade deleted");
         }
     }
 }

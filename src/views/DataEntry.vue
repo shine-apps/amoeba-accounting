@@ -62,17 +62,29 @@
     <!-- 销售收入 -->
     <el-card shadow="never" class="page-card">
       <template #header>
-        <span>销售收入</span>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <span>销售收入</span>
+          <el-button type="primary" link size="small" @click="openIncomeDialog">
+            <el-icon><Setting /></el-icon>
+            管理收入类别
+          </el-button>
+        </div>
       </template>
-      <IncomeEditor v-model="formData.income_details" />
+      <IncomeEditor v-model="formData.income_details" :categories="incomeCategoryOptions" />
     </el-card>
 
     <!-- 费用明细 -->
     <el-card shadow="never" class="page-card">
       <template #header>
-        <span>费用明细</span>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <span>费用明细</span>
+          <el-button type="primary" link size="small" @click="openExpenseDialog">
+            <el-icon><Setting /></el-icon>
+            管理费用类别
+          </el-button>
+        </div>
       </template>
-      <ExpenseEditor v-model="formData.expenses" />
+      <ExpenseEditor v-model="formData.expenses" :categories="expenseCategoryOptions" />
     </el-card>
 
     <!-- 劳动时间 -->
@@ -97,15 +109,101 @@
       <el-button @click="handleReset">重置</el-button>
       <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
     </div>
+    <!-- 管理收入类别对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      title="管理收入类别"
+      width="700px"
+      :close-on-click-modal="false"
+    >
+      <el-table :data="dialogIncomeCategories" border size="small" style="width: 100%">
+        <el-table-column label="名称" min-width="140">
+          <template #default="{ row }">
+            <el-input v-model="row.name" size="small" placeholder="类别名称" />
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="200">
+          <template #default="{ row }">
+            <el-input v-model="row.desc" size="small" placeholder="类别说明" />
+          </template>
+        </el-table-column>
+        <el-table-column label="排序" width="80">
+          <template #default="{ row }">
+            <el-input-number v-model="row.sort_order" :min="1" size="small" :controls="false" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="70" align="center">
+          <template #default="{ $index }">
+            <el-button type="danger" link size="small" @click="removeDialogIncomeRow($index)">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top: 12px">
+        <el-button type="primary" link size="small" @click="addDialogIncomeRow">
+          <el-icon><Plus /></el-icon>
+          添加收入类别
+        </el-button>
+      </div>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="dialogSaving" @click="handleDialogSave">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 管理费用类别对话框 -->
+    <el-dialog
+      v-model="expenseDialogVisible"
+      title="管理费用类别"
+      width="700px"
+      :close-on-click-modal="false"
+    >
+      <el-table :data="expenseDialogCategories" border size="small" style="width: 100%">
+        <el-table-column label="名称" min-width="140">
+          <template #default="{ row }">
+            <el-input v-model="row.name" size="small" placeholder="类别名称" />
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="200">
+          <template #default="{ row }">
+            <el-input v-model="row.desc" size="small" placeholder="类别说明" />
+          </template>
+        </el-table-column>
+        <el-table-column label="排序" width="80">
+          <template #default="{ row }">
+            <el-input-number v-model="row.sort_order" :min="1" size="small" :controls="false" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="70" align="center">
+          <template #default="{ $index }">
+            <el-button type="danger" link size="small" @click="removeDialogExpenseRow($index)">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top: 12px">
+        <el-button type="primary" link size="small" @click="addDialogExpenseRow">
+          <el-icon><Plus /></el-icon>
+          添加费用类别
+        </el-button>
+      </div>
+      <template #footer>
+        <el-button @click="expenseDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="expenseDialogSaving" @click="handleExpenseDialogSave">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAmoebaStore } from '@/stores/amoeba'
 import { useRecordStore } from '@/stores/record'
+import { useCategoryStore } from '@/stores/category'
 import { useAccounting } from '@/composables/useAccounting'
 import { PERIOD_TYPES } from '@/utils/constants'
 import IncomeEditor from '@/components/IncomeEditor.vue'
@@ -114,12 +212,162 @@ import LaborTimeEditor from '@/components/LaborTimeEditor.vue'
 import ResultPreview from '@/components/ResultPreview.vue'
 import type { RecordInput, ExpenseDetailInput, IncomeDetailInput, LaborTimeInput } from '@/types/record'
 import type { AccountingResult } from '@/types/accounting'
+import type { AmoebaCategoryInput, CategoryList } from '@/types/category'
 
 const route = useRoute()
 const router = useRouter()
 const amoebaStore = useAmoebaStore()
 const recordStore = useRecordStore()
+const categoryStore = useCategoryStore()
 const { calculate } = useAccounting()
+
+const currentCategories = ref<CategoryList | null>(null)
+
+const incomeCategoryOptions = computed(() => {
+  const cats = currentCategories.value?.income
+  if (cats && cats.length > 0) {
+    return cats.filter((c) => c.id != null).map((c) => ({ id: c.id!, name: c.name }))
+  }
+  return []
+})
+
+const expenseCategoryOptions = computed(() => {
+  const cats = currentCategories.value?.expense
+  if (cats && cats.length > 0) {
+    return cats.filter((c) => c.id != null).map((c) => ({ id: c.id!, name: c.name }))
+  }
+  return []
+})
+
+// 管理收入类别对话框
+const dialogVisible = ref(false)
+const dialogIncomeCategories = ref<AmoebaCategoryInput[]>([])
+const dialogSaving = ref(false)
+
+function openIncomeDialog() {
+  const cats = currentCategories.value?.income ?? []
+  dialogIncomeCategories.value = cats.map((c) => ({
+    category_type: 'income' as const,
+    name: c.name,
+    desc: c.desc,
+    sort_order: c.sort_order,
+  }))
+  dialogVisible.value = true
+}
+
+function addDialogIncomeRow() {
+  const maxSort = dialogIncomeCategories.value.reduce((max, c) => Math.max(max, c.sort_order), 0)
+  dialogIncomeCategories.value.push({
+    category_type: 'income',
+    name: '',
+    desc: '',
+    sort_order: maxSort + 1,
+  })
+}
+
+function removeDialogIncomeRow(index: number) {
+  dialogIncomeCategories.value.splice(index, 1)
+}
+
+async function handleDialogSave() {
+  if (!formData.amoeba_id) return
+
+  for (const c of dialogIncomeCategories.value) {
+    if (!c.name.trim()) {
+      ElMessage.warning('收入类别名称不能为空')
+      return
+    }
+  }
+
+  dialogSaving.value = true
+  try {
+    dialogIncomeCategories.value.forEach((c, i) => (c.sort_order = i + 1))
+    // Keep existing expense categories unchanged
+    const expenseCats = currentCategories.value?.expense ?? []
+    await categoryStore.save(formData.amoeba_id, {
+      income: dialogIncomeCategories.value,
+      expense: expenseCats.map((c) => ({
+        category_type: 'expense' as const,
+        name: c.name,
+        desc: c.desc,
+        sort_order: c.sort_order,
+      })),
+    })
+    categoryStore.categoriesByAmoeba.delete(formData.amoeba_id)
+    currentCategories.value = await categoryStore.fetchByAmoeba(formData.amoeba_id)
+    dialogVisible.value = false
+    ElMessage.success('保存成功')
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    dialogSaving.value = false
+  }
+}
+
+// 管理费用类别对话框
+const expenseDialogVisible = ref(false)
+const expenseDialogCategories = ref<AmoebaCategoryInput[]>([])
+const expenseDialogSaving = ref(false)
+
+function openExpenseDialog() {
+  const cats = currentCategories.value?.expense ?? []
+  expenseDialogCategories.value = cats.map((c) => ({
+    category_type: 'expense' as const,
+    name: c.name,
+    desc: c.desc,
+    sort_order: c.sort_order,
+  }))
+  expenseDialogVisible.value = true
+}
+
+function addDialogExpenseRow() {
+  const maxSort = expenseDialogCategories.value.reduce((max, c) => Math.max(max, c.sort_order), 0)
+  expenseDialogCategories.value.push({
+    category_type: 'expense',
+    name: '',
+    desc: '',
+    sort_order: maxSort + 1,
+  })
+}
+
+function removeDialogExpenseRow(index: number) {
+  expenseDialogCategories.value.splice(index, 1)
+}
+
+async function handleExpenseDialogSave() {
+  if (!formData.amoeba_id) return
+
+  for (const c of expenseDialogCategories.value) {
+    if (!c.name.trim()) {
+      ElMessage.warning('费用类别名称不能为空')
+      return
+    }
+  }
+
+  expenseDialogSaving.value = true
+  try {
+    expenseDialogCategories.value.forEach((c, i) => (c.sort_order = i + 1))
+    // Keep existing income categories unchanged
+    const incomeCats = currentCategories.value?.income ?? []
+    await categoryStore.save(formData.amoeba_id, {
+      income: incomeCats.map((c) => ({
+        category_type: 'income' as const,
+        name: c.name,
+        desc: c.desc,
+        sort_order: c.sort_order,
+      })),
+      expense: expenseDialogCategories.value,
+    })
+    categoryStore.categoriesByAmoeba.delete(formData.amoeba_id)
+    currentCategories.value = await categoryStore.fetchByAmoeba(formData.amoeba_id)
+    expenseDialogVisible.value = false
+    ElMessage.success('保存成功')
+  } catch (error: any) {
+    ElMessage.error(error.message || '保存失败')
+  } finally {
+    expenseDialogSaving.value = false
+  }
+}
 
 const isEdit = computed(() => !!route.params.id)
 const saving = ref(false)
@@ -151,6 +399,16 @@ watch(dateRange, (val) => {
   }
 })
 
+watch(() => formData.amoeba_id, async (newId) => {
+  if (newId) {
+    currentCategories.value = await categoryStore.fetchByAmoeba(newId)
+    if (!isEdit.value) {
+      formData.income_details = getDefaultIncomes()
+      formData.expenses = getDefaultExpenses()
+    }
+  }
+})
+
 const previewResult = computed<AccountingResult | null>(() => {
   if (formData.income_details.length === 0 && formData.expenses.length === 0) {
     return null
@@ -159,27 +417,13 @@ const previewResult = computed<AccountingResult | null>(() => {
 })
 
 function getDefaultIncomes(): IncomeDetailInput[] {
-  return [
-    { category: 'external_sales', amount: 0, description: '' },
-    { category: 'internal_sales', amount: 0, description: '' },
-    { category: 'service', amount: 0, description: '' },
-    { category: 'other', amount: 0, description: '' },
-  ]
+  const cats = currentCategories.value?.income ?? []
+  return cats.map((c) => ({ category: c.id!, amount: 0, description: '' }))
 }
 
 function getDefaultExpenses(): ExpenseDetailInput[] {
-  return [
-    { category: 'material', amount: 0, description: '' },
-    { category: 'outsourcing', amount: 0, description: '' },
-    { category: 'electricity', amount: 0, description: '' },
-    { category: 'depreciation', amount: 0, description: '' },
-    { category: 'transport', amount: 0, description: '' },
-    { category: 'maintenance', amount: 0, description: '' },
-    { category: 'office', amount: 0, description: '' },
-    { category: 'communication', amount: 0, description: '' },
-    { category: 'travel', amount: 0, description: '' },
-    { category: 'other', amount: 0, description: '' },
-  ]
+  const cats = currentCategories.value?.expense ?? []
+  return cats.map((c) => ({ category: c.id!, amount: 0, description: '' }))
 }
 
 function resetForm() {
@@ -276,6 +520,10 @@ async function loadRecord() {
         }
       }
       dateRange.value = [record.period_start, record.period_end]
+
+      if (record.amoeba_id) {
+        currentCategories.value = await categoryStore.fetchByAmoeba(record.amoeba_id)
+      }
     }
   } catch (error: any) {
     ElMessage.error(error.message || '加载记录失败')
@@ -287,6 +535,12 @@ onMounted(async () => {
   if (isEdit.value) {
     await loadRecord()
   } else {
+    if (amoebaStore.amoebas.length > 0 && !formData.amoeba_id) {
+      formData.amoeba_id = amoebaStore.amoebas[0].id!
+    }
+    if (formData.amoeba_id) {
+      currentCategories.value = await categoryStore.fetchByAmoeba(formData.amoeba_id)
+    }
     formData.income_details = getDefaultIncomes()
     formData.expenses = getDefaultExpenses()
   }

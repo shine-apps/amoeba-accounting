@@ -67,7 +67,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS expense_detail (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             record_id   INTEGER NOT NULL,
-            category    TEXT NOT NULL,
+            category    INTEGER NOT NULL,
             amount      REAL NOT NULL DEFAULT 0,
             description TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (record_id) REFERENCES accounting_record(id) ON DELETE CASCADE
@@ -86,10 +86,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS income_detail (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             record_id   INTEGER NOT NULL,
-            category    TEXT NOT NULL,
+            category    INTEGER NOT NULL,
             amount      REAL NOT NULL DEFAULT 0,
             description TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (record_id) REFERENCES accounting_record(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS amoeba_category (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            amoeba_id       INTEGER NOT NULL,
+            category_type   TEXT NOT NULL CHECK(category_type IN ('income', 'expense')),
+            name            TEXT NOT NULL,
+            desc            TEXT NOT NULL DEFAULT '',
+            sort_order      INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (amoeba_id) REFERENCES amoeba(id) ON DELETE CASCADE
         );
 
         CREATE INDEX IF NOT EXISTS idx_accounting_record_amoeba ON accounting_record(amoeba_id);
@@ -97,6 +107,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_expense_detail_record ON expense_detail(record_id);
         CREATE INDEX IF NOT EXISTS idx_labor_time_record ON labor_time(record_id);
         CREATE INDEX IF NOT EXISTS idx_income_detail_record ON income_detail(record_id);
+        CREATE INDEX IF NOT EXISTS idx_amoeba_category_amoeba ON amoeba_category(amoeba_id);
         ",
     )?;
 

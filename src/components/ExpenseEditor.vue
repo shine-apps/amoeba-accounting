@@ -6,9 +6,9 @@
           <el-select v-model="row.category" placeholder="选择类别" size="small" style="width: 100%">
             <el-option
               v-for="cat in expenseOptions"
-              :key="cat.code"
+              :key="cat.id"
               :label="cat.name"
-              :value="cat.code"
+              :value="cat.id"
             />
           </el-select>
         </template>
@@ -54,20 +54,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ExpenseDetailInput } from '@/types/record'
-import { EXPENSE_CATEGORIES } from '@/utils/constants'
 import { formatMoney } from '@/utils/format'
+
+const props = defineProps<{
+  categories: Array<{ id: number; name: string }>
+}>()
 
 const modelValue = defineModel<ExpenseDetailInput[]>({ required: true })
 
-const expenseOptions = EXPENSE_CATEGORIES
+const expenseOptions = computed(() => props.categories)
 
 const totalExpense = computed(() => {
   return modelValue.value.reduce((sum, e) => sum + (e.amount || 0), 0)
 })
 
 function addCustomRow() {
+  const defaultId = expenseOptions.value.length > 0 ? expenseOptions.value[0].id : 10
   modelValue.value.push({
-    category: 'other',
+    category: defaultId,
     amount: 0,
     description: '',
   })

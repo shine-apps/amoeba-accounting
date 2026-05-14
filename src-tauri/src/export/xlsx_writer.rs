@@ -162,8 +162,8 @@ fn write_accounting_sheet(
             None => continue,
         };
 
-        let external_sales = get_income_by_category(record, "external_sales");
-        let internal_sales = get_income_by_category(record, "internal_sales");
+        let external_sales = get_income_by_category(record, 1);
+        let internal_sales = get_income_by_category(record, 2);
 
         sheet
             .write_string_with_format(row, 0, &record.period_start, &normal_fmt)
@@ -301,10 +301,10 @@ fn write_accounting_sheet(
     Ok(())
 }
 
-/// 从收入明细中获取指定分类的金额
-fn get_income_by_category(record: &AccountingRecord, category: &str) -> f64 {
+/// 从收入明细中获取指定分类 ID 的金额
+fn get_income_by_category(record: &AccountingRecord, category_id: i64) -> f64 {
     record.income_details.iter()
-        .find(|i| i.category == category)
+        .find(|i| i.category == category_id)
         .map(|i| i.amount)
         .unwrap_or(0.0)
 }
@@ -342,7 +342,7 @@ fn write_income_sheet(
         for income in &record.income_details {
             sheet.write_string_with_format(row, 0, &record.period_start, &normal_fmt)
                 .map_err(|e| format!("写入数据失败: {}", e))?;
-            sheet.write_string_with_format(row, 1, &income.category, &normal_left_fmt)
+            sheet.write_number_with_format(row, 1, income.category as f64, &normal_left_fmt)
                 .map_err(|e| format!("写入数据失败: {}", e))?;
 
             let fmt = if income.amount < 0.0 { &neg_money_fmt } else { &money_fmt };
@@ -407,7 +407,7 @@ fn write_expense_sheet(
                 .write_string_with_format(row, 0, &record.period_start, &normal_fmt)
                 .map_err(|e| format!("写入数据失败: {}", e))?;
             sheet
-                .write_string_with_format(row, 1, &expense.category, &normal_left_fmt)
+                .write_number_with_format(row, 1, expense.category as f64, &normal_left_fmt)
                 .map_err(|e| format!("写入数据失败: {}", e))?;
 
             let fmt = if expense.amount < 0.0 { &neg_money_fmt } else { &money_fmt };

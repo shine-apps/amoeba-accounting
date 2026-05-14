@@ -30,8 +30,8 @@ function makeRecord(overrides: Partial<AccountingRecord> = {}): AccountingRecord
     created_at: '2026-05-01T00:00:00',
     updated_at: '2026-05-01T00:00:00',
     income_details: [
-      { category: 'external_sales', amount: 800000, description: '' },
-      { category: 'internal_sales', amount: 200000, description: '' },
+      { category: 1, amount: 800000, description: '' },
+      { category: 2, amount: 200000, description: '' },
     ],
     expenses: [],
     labor: {
@@ -63,7 +63,7 @@ function makeInput(overrides: Partial<RecordInput> = {}): RecordInput {
     period_end: '2026-06-30',
     remark: 'new',
     income_details: [
-      { category: 'external_sales', amount: 500000, description: '' },
+      { category: 1, amount: 500000, description: '' },
     ],
     expenses: [],
     labor: { normal_hours: 160, overtime_hours: 0, public_hours: 0, headcount: 3 },

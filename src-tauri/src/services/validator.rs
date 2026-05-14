@@ -31,7 +31,7 @@ pub fn validate_record(input: &RecordInput) -> Result<(), String> {
 
     // 校验收入明细
     for (i, income) in input.income_details.iter().enumerate() {
-        if income.category.trim().is_empty() {
+        if income.category <= 0 {
             return Err(format!("第 {} 项收入明细的分类不能为空", i + 1));
         }
         if income.amount < 0.0 {
@@ -41,7 +41,7 @@ pub fn validate_record(input: &RecordInput) -> Result<(), String> {
 
     // 校验费用明细
     for (i, expense) in input.expenses.iter().enumerate() {
-        if expense.category.trim().is_empty() {
+        if expense.category <= 0 {
             return Err(format!("第 {} 项费用明细的分类不能为空", i + 1));
         }
         if expense.amount < 0.0 {

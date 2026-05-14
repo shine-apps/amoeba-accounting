@@ -39,6 +39,10 @@
             <el-icon><Download /></el-icon>
             <template #title>导出</template>
           </el-menu-item>
+          <el-menu-item index="/settings">
+            <el-icon><Setting /></el-icon>
+            <template #title>类别设置</template>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       <el-main class="app-main">

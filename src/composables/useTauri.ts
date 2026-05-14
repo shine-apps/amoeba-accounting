@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { Amoeba, AmoebaInput } from '@/types/amoeba'
 import type { AccountingRecord, RecordInput } from '@/types/record'
+import type { CategoryList, SaveCategoriesInput } from '@/types/category'
 
 export function useTauri() {
   // ===== 阿米巴管理 =====
@@ -18,6 +19,19 @@ export function useTauri() {
 
   async function deleteAmoeba(id: number): Promise<void> {
     return invoke<void>('delete_amoeba', { id })
+  }
+
+  // ===== 类别设置管理 =====
+  async function getCategories(amoebaId: number): Promise<CategoryList> {
+    return invoke<CategoryList>('get_categories', { amoebaId })
+  }
+
+  async function saveCategories(amoebaId: number, input: SaveCategoriesInput): Promise<void> {
+    return invoke<void>('save_categories', { amoebaId, input })
+  }
+
+  async function resetCategories(amoebaId: number): Promise<CategoryList> {
+    return invoke<CategoryList>('reset_categories', { amoebaId })
   }
 
   // ===== 核算记录管理 =====
@@ -52,6 +66,9 @@ export function useTauri() {
     createAmoeba,
     updateAmoeba,
     deleteAmoeba,
+    getCategories,
+    saveCategories,
+    resetCategories,
     listRecords,
     getRecord,
     saveRecord,

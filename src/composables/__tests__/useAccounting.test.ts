@@ -7,13 +7,13 @@ const { calculate } = useAccounting()
 describe('useAccounting.calculate', () => {
   it('computes all 9 formulas correctly for standard data', () => {
     const incomeDetails: IncomeDetailInput[] = [
-      { category: 'external_sales', amount: 800000, description: '对外' },
-      { category: 'internal_sales', amount: 200000, description: '内部' },
+      { category: 1, amount: 800000, description: '对外' },
+      { category: 2, amount: 200000, description: '内部' },
     ]
     const expenses: ExpenseDetailInput[] = [
-      { category: 'material', amount: 400000, description: '原材料' },
-      { category: 'electricity', amount: 50000, description: '电费' },
-      { category: 'depreciation', amount: 30000, description: '折旧' },
+      { category: 1, amount: 400000, description: '原材料' },
+      { category: 3, amount: 50000, description: '电费' },
+      { category: 4, amount: 30000, description: '折旧' },
     ]
     const labor: LaborTimeInput = {
       normal_hours: 800,
@@ -38,7 +38,7 @@ describe('useAccounting.calculate', () => {
   it('handles zero sales — negative added value, zero rates', () => {
     const incomeDetails: IncomeDetailInput[] = []
     const expenses: ExpenseDetailInput[] = [
-      { category: 'material', amount: 1000, description: '' },
+      { category: 1, amount: 1000, description: '' },
     ]
     const labor: LaborTimeInput = {
       normal_hours: 100,
@@ -59,7 +59,7 @@ describe('useAccounting.calculate', () => {
 
   it('returns zero unit_value when total hours is zero', () => {
     const incomeDetails: IncomeDetailInput[] = [
-      { category: 'external_sales', amount: 10000, description: '' },
+      { category: 1, amount: 10000, description: '' },
     ]
     const expenses: ExpenseDetailInput[] = []
     const labor: LaborTimeInput = {
@@ -77,7 +77,7 @@ describe('useAccounting.calculate', () => {
 
   it('handles empty expense list', () => {
     const incomeDetails: IncomeDetailInput[] = [
-      { category: 'external_sales', amount: 50000, description: '' },
+      { category: 1, amount: 50000, description: '' },
     ]
     const labor: LaborTimeInput = {
       normal_hours: 160,
@@ -95,10 +95,10 @@ describe('useAccounting.calculate', () => {
 
   it('handles loss scenario (expenses > sales)', () => {
     const incomeDetails: IncomeDetailInput[] = [
-      { category: 'external_sales', amount: 500000, description: '' },
+      { category: 1, amount: 500000, description: '' },
     ]
     const expenses: ExpenseDetailInput[] = [
-      { category: 'material', amount: 900000, description: '' },
+      { category: 1, amount: 900000, description: '' },
     ]
     const labor: LaborTimeInput = {
       normal_hours: 500,

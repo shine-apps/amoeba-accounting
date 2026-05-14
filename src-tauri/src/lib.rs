@@ -29,6 +29,10 @@ pub fn run() {
             commands::create_amoeba,
             commands::update_amoeba,
             commands::delete_amoeba,
+            // 类别设置
+            commands::get_categories,
+            commands::save_categories,
+            commands::reset_categories,
             // 核算记录管理
             commands::list_records,
             commands::get_record,

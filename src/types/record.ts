@@ -1,4 +1,4 @@
-import type { ExpenseDetail, IncomeDetail, LaborTime, AccountingResult } from './accounting'
+import type { ExpenseDetail, ExpenseDetailInput, IncomeDetail, IncomeDetailInput, LaborTime, LaborTimeInput, AccountingResult } from './accounting'
 
 export interface AccountingRecord {
   id?: number

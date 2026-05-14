@@ -1,13 +1,13 @@
 export interface ExpenseDetail {
   id?: number
   record_id?: number
-  category: string
+  category: number
   amount: number
   description: string
 }
 
 export interface ExpenseDetailInput {
-  category: string
+  category: number
   amount: number
   description: string
 }
@@ -15,13 +15,13 @@ export interface ExpenseDetailInput {
 export interface IncomeDetail {
   id?: number
   record_id?: number
-  category: string
+  category: number
   amount: number
   description: string
 }
 
 export interface IncomeDetailInput {
-  category: string
+  category: number
   amount: number
   description: string
 }

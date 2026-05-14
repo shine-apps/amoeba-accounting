@@ -58,6 +58,8 @@
       <AccountingTable
         :records="displayRecords"
         :show-comparison="showComparison"
+        :income-categories="incomeCategoryOptions"
+        :expense-categories="expenseCategoryOptions"
       />
       <el-empty v-if="!loading && displayRecords.length === 0" description="暂无数据" />
     </el-card>
@@ -67,11 +69,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAmoebaStore } from '@/stores/amoeba'
+import { useCategoryStore } from '@/stores/category'
 import { useTauri } from '@/composables/useTauri'
 import AccountingTable from '@/components/AccountingTable.vue'
 import type { AccountingRecord } from '@/types/record'
+import type { CategoryList } from '@/types/category'
 
 const amoebaStore = useAmoebaStore()
+const categoryStore = useCategoryStore()
 const { listRecords } = useTauri()
 
 const selectedAmoebaId = ref<number | undefined>(undefined)
@@ -80,6 +85,23 @@ const dateRange = ref<string[]>([])
 const showComparison = ref(true)
 const loading = ref(false)
 const allRecords = ref<AccountingRecord[]>([])
+const currentCategories = ref<CategoryList | null>(null)
+
+const incomeCategoryOptions = computed(() => {
+  const cats = currentCategories.value?.income
+  if (cats && cats.length > 0) {
+    return cats.filter((c) => c.id != null).map((c) => ({ id: c.id!, name: c.name }))
+  }
+  return []
+})
+
+const expenseCategoryOptions = computed(() => {
+  const cats = currentCategories.value?.expense
+  if (cats && cats.length > 0) {
+    return cats.filter((c) => c.id != null).map((c) => ({ id: c.id!, name: c.name }))
+  }
+  return []
+})
 
 const reportTitle = computed(() => {
   const amoeba = amoebaStore.amoebas.find((a) => a.id === selectedAmoebaId.value)
@@ -119,6 +141,7 @@ async function handleFilterChange() {
   loading.value = true
   try {
     if (selectedAmoebaId.value) {
+      currentCategories.value = await categoryStore.fetchByAmoeba(selectedAmoebaId.value)
       allRecords.value = await listRecords(selectedAmoebaId.value)
     } else {
       // 获取所有阿米巴的记录

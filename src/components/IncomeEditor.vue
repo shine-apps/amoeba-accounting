@@ -6,9 +6,9 @@
           <el-select v-model="row.category" placeholder="选择类别" size="small" style="width: 100%">
             <el-option
               v-for="cat in incomeOptions"
-              :key="cat.code"
+              :key="cat.id"
               :label="cat.name"
-              :value="cat.code"
+              :value="cat.id"
             />
           </el-select>
         </template>
@@ -54,20 +54,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { IncomeDetailInput } from '@/types/record'
-import { INCOME_CATEGORIES } from '@/utils/constants'
 import { formatMoney } from '@/utils/format'
+
+const props = defineProps<{
+  categories: Array<{ id: number; name: string }>
+}>()
 
 const modelValue = defineModel<IncomeDetailInput[]>({ required: true })
 
-const incomeOptions = INCOME_CATEGORIES
+const incomeOptions = computed(() => props.categories)
 
 const totalIncome = computed(() => {
   return modelValue.value.reduce((sum, i) => sum + (i.amount || 0), 0)
 })
 
 function addCustomRow() {
+  const defaultId = incomeOptions.value.length > 0 ? incomeOptions.value[0].id : 4
   modelValue.value.push({
-    category: 'other',
+    category: defaultId,
     amount: 0,
     description: '',
   })
