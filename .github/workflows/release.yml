@@ -14,15 +14,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-            name: 'macOS-Apple-Silicon'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-            name: 'macOS-Intel'
-          - platform: 'ubuntu-22.04'
-            args: ''
-            name: 'Linux'
+          # - platform: 'macos-latest'
+          #   args: '--target aarch64-apple-darwin'
+          #   name: 'macOS-Apple-Silicon'
+          # - platform: 'macos-latest'
+          #   args: '--target x86_64-apple-darwin'
+          #   name: 'macOS-Intel'
+          # - platform: 'ubuntu-22.04'
+          #   args: ''
+          #   name: 'Linux'
           - platform: 'windows-latest'
             args: ''
             name: 'Windows'
@@ -83,3 +83,22 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+      - name: List Windows bundle output (debug)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          echo "Listing bundle output (Windows):"
+          # Prefer Windows style path on windows runner, fallback to posix path for other shells
+          if [ -d "src-tauri/target/release/bundle/nsis" ]; then
+            ls -la src-tauri/target/release/bundle/nsis || true
+          else
+            powershell -NoProfile -Command "Get-ChildItem -Path src-tauri\\target\\release\\bundle\\nsis -Force -ErrorAction SilentlyContinue | Format-List" || echo "No NSIS directory found"
+          fi
+
+      - name: Upload Windows build artifacts
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers-${{ github.ref_name }}
+          path: |
+            src-tauri/target/release/bundle/nsis/**
+            src-tauri/target/release/bundle/msi/**      # include MSI if produced
