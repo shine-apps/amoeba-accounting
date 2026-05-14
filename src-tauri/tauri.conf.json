@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/tauri.conf.json",
-  "productName": "阿米巴单位时间核算表",
+  "productName": "amoeba-accounting",
   "version": "0.1.0",
   "identifier": "com.amoeba.accounting",
   "build": {
