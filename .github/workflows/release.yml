@@ -83,16 +83,15 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      # After the Tauri build step, insert:
       - name: List Windows bundle output (debug)
         if: matrix.platform == 'windows-latest'
         run: |
-          echo "Listing bundle output (Windows):"
-          # Prefer Windows style path on windows runner, fallback to posix path for other shells
-          if [ -d "src-tauri/target/release/bundle/nsis" ]; then
-            ls -la src-tauri/target/release/bundle/nsis || true
-          else
-            powershell -NoProfile -Command "Get-ChildItem -Path src-tauri\\target\\release\\bundle\\nsis -Force -ErrorAction SilentlyContinue | Format-List" || echo "No NSIS directory found"
-          fi
+          echo "Windows NSIS output:"
+          ls -l src-tauri/target/release/bundle/nsis || echo "No NSIS directory found"
+          echo "Windows MSI output:"
+          ls -l src-tauri/target/release/bundle/msi || echo "No MSI directory found"
 
       - name: Upload Windows build artifacts
         if: matrix.platform == 'windows-latest'
@@ -100,5 +99,7 @@ jobs:
         with:
           name: windows-installers-${{ github.ref_name }}
           path: |
-            src-tauri/target/release/bundle/nsis/**
-            src-tauri/target/release/bundle/msi/**      # include MSI if produced
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.zip
+            src-tauri/target/release/bundle/nsis/*.sig
+            src-tauri/target/release/bundle/msi/*
