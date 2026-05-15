@@ -1,0 +1,48 @@
+version: '1.0'
+name: release-pipeline
+displayName: 发布构建流水线（Linux + Windows 交叉编译）
+
+# 注意：
+# Gitee Go 目前仅提供 Linux 运行器，因此：
+#   ✅ Linux   — 原生构建 .deb + .AppImage
+#   ✅ Windows — MinGW 交叉编译 NSIS 安装包
+#   ❌ macOS   — 无法从 Linux 交叉编译，需使用 GitHub Actions 构建
+# 如需要 macOS 支持，可以部署私有 macOS 运行器到 Gitee Go。
+
+triggers:
+  trigger: auto
+  push:
+    tags:
+      prefix:
+        - v
+
+variables:
+  global:
+    - GITEE_TOKEN
+
+stages:
+  - stage:
+      name: build-and-release
+      displayName: 构建与发布
+      strategy: naturally
+      trigger: auto
+      steps:
+        - step: build@nodejs
+          name: tauri-build
+          displayName: Tauri 应用构建（Linux + Windows 交叉编译）
+          nodeVersion: 20
+          commands:
+            - bash .gitee/scripts/build.sh
+          artifacts:
+            - name: TAURI_BUNDLE
+              path:
+                - ./src-tauri/target/release/bundle
+                - ./src-tauri/target/x86_64-pc-windows-gnu/release/bundle
+
+        - step: build@nodejs
+          name: create-release
+          displayName: 创建 Gitee 发行版
+          nodeVersion: 20
+          dependsOn: tauri-build
+          commands:
+            - bash .gitee/scripts/release.sh
